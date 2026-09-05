@@ -1,0 +1,277 @@
+#
+# This file contains rules that control how Git handles binary and text files, including line endings. Note that
+# 'filter' uses native Git mechanics and is indeed case insensitive on Windows/NTFS. However, your repository would run
+# into trouble on a case sensitive filesystem (e.g. Linux) should you fail treat your files as case sensitive.
+#
+
+# Omit the .git folder on export
+.git* export-ignore
+
+# Set the text attribute to "auto" for all files to ensure that text files any contributor might introduce to the
+# repository have line endings normalized (to LF). Also set default line ending for the work tree as LF. Windows is way
+# more tolerant with LF than other systems are with CRLF and most modern editors can deal with either line endings
+# anyway so we can default to LF here and create exceptions below for specific Windows files such as *.cmd and *.bat
+# which are still sensitive to line-endings. This setting should be consistent with the end_of_line property for [*] in
+# the .editorconfig file.
+* text=auto              eol=lf
+
+# Avoid warnings about .gitmodules line-endings by setting it explicitly
+.gitmodules              eol=lf
+
+# Unix Shell script lines must end with LF or the script will not run.
+# Windows Batch script lines must end with CRLF to avoid a bug where the parser can only find labels within 512-byte
+# block boundaries. This is important when files are downloaded through a zip archive created on a Linux machine (as is
+# the case with GitHub archive downloads) See https://stackoverflow.com/a/232674.
+
+## Windows specific files
+*.bat               text eol=crlf
+*.bat.in            text eol=crlf
+*.cmd               text eol=crlf
+*.cmd.in            text eol=crlf
+*.ps1               text eol=crlf
+*.vcxproj           text eol=crlf
+*.vcxproj.filters   text eol=crlf
+*.sln               text eol=crlf
+*.wixproj           text eol=crlf
+*.wxi               text eol=crlf
+*.wxs               text eol=crlf
+*.reg               text eol=crlf
+
+# Leave .idea xml files alone by default as JetBrains IDEs insist on using the platform EOL when writing to those files.
+.idea/**/*.xml                                      !eol
+.idea/inspectionProfiles/Project_Default.xml        eol=lf
+
+###
+# Source Code
+#
+*.[sS][hH]                                          diff=bash
+*.[cC][sS]                                          diff=csharp
+*.[cC]                                              diff=cpp
+*.[cC][cC]                                          diff=cpp
+*.[cC][xX][xX]                                      diff=cpp
+*.[cC][pP][pP]                                      diff=cpp
+*.[cC]++                                            diff=cpp
+*.[hH][pP][pP]                                      diff=cpp
+*.[hH]                                              diff=cpp
+*.[hH]++                                            diff=cpp
+*.[hH][hH]                                          diff=cpp
+*.[rR][cC]                                          diff=cpp
+*.[dD][tT][sS]                                      diff=dts
+*.[gG][oO]                                          diff=golang
+*.[jJ][aA][vV][aA]                                  diff=java
+*.[lL][uU][aA]                                      diff=patience
+*.[oO][bB][jJ][cC]                                  diff=objc
+*.[pP][yY]                                          diff=python
+*.[rR][sS]                                          diff=rust
+
+*.[mM][dD]                                          diff=markdown
+*.[hH][tT][mM][lL]                                  diff=html
+*.[hH][tT][mM]                                      diff=html
+*.[xX][hH][tT][mM][lL]                              diff=html
+*.[xX][hH][tT][mM]                                  diff=html
+*.[xX][mM][lL]                                      diff=patience
+*.[cC][sS][sS]                                      diff=css
+# Javascript can use a custom function header parser diff hunks. Make sure to run:
+#
+#     git config --global diff.javascript.xfuncname \
+#     '!^[ \t]*(if|else|for|while|do|switch|try|catch|finally|return|throw'\
+#     '|yield|await|case|break|continue|delete|typeof|void|new|in|of|with)'\
+#     '([^A-Za-z0-9_$].*)?$'$'\n'\
+#     '^[ \t]*((export[ \t]+)?(default[ \t]+)?(async[ \t]+)?'\
+#     '(function([ \t*(])|class([ \t{]|$)).*)$'$'\n'\
+#     '^[ \t]*((export[ \t]+)?(const|let|var)[ \t]+'\
+#     '[A-Za-z_$][A-Za-z0-9_$]*[ \t]*=[ \t]*(async[ \t]*)?'\
+#     '(function([ \t*(])|class([ \t{]|$)'\
+#     '|(\(.*\)|[A-Za-z_$][A-Za-z0-9_$]*)[ \t]*=>'\
+#     '|[A-Za-z_$][A-Za-z0-9_$.]*[ \t]*\(.*(=>|function([ \t*(]))).*)$'$'\n'\
+#     '^[ \t]*((static[ \t]+)?#?[A-Za-z_$][A-Za-z0-9_$.]*[ \t]*='\
+#     '[ \t]*(async[ \t]*)?(function([ \t*(])|class([ \t{]|$)'\
+#     '|(\(.*\)|[A-Za-z_$][A-Za-z0-9_$]*)[ \t]*=>).*)$'$'\n'\
+#     '^[ \t]*(((static|async|get|set)[ \t]+)*\*?[ \t]*'\
+#     '(#?[A-Za-z_$][A-Za-z0-9_$]*|\[[^]]*\])[ \t]*\(.*\)[ \t]*\{[ \t]*$)'$'\n'\
+#     '^[ \t]*(["'\'']?[A-Za-z_$][A-Za-z0-9_$]*["'\'']?[ \t]*:[ \t]*'\
+#     '(async[ \t]*)?(function([ \t*(])'\
+#     '|(\(.*\)|[A-Za-z_$][A-Za-z0-9_$]*)[ \t]*=>).*)$'$'\n'\
+#     '^[ \t]*([A-Za-z_$][A-Za-z0-9_$.]*[ \t]*\(.*'\
+#     '(=>|function([ \t*(]).*)[ \t]*\{[ \t]*$)'$'\n'\
+#     '^[ \t]*(\((async[ \t]*)?(function([ \t*(])|\().*)$'
+#
+# Rules in order:
+#
+# - Rule 1 — keyword veto (negative, !). Rejects any line starting with a control-flow or operator keyword: if, else,
+#   for, while, do, switch, try, catch, finally, return, throw, yield, await, case, break, continue, delete, typeof,
+#   void, new, in, of, with. Stops if (x) { or return (err) => { from being mistaken for a method or callback by the
+#   later rules.
+#
+# - Rule 2 — declarations. function and class declarations, with optional export, default, async prefixes; covers
+#   generators (function*), anonymous forms (function(, class {), and extends clauses. Examples: export default async
+#   function main() {, class Foo extends Bar {.
+
+# - Rule 3 — variable-bound functions. const/let/var (optionally exported) where the assigned value is a function
+#   expression, arrow (parenthesized or single-param), class expression, or a wrapper call containing => or function.
+#   Examples:
+#     - const add = (a, b) => {
+#     - let mul = async x => {
+#     - const Wrapped = memo(() => {
+#
+#   Plain values (const tmp = 1;) don't match.
+#
+# - Rule 4 — other function assignments. Same value shapes, but the left side is any (possibly dotted) name, static
+#   field, or #private field instead of a declared variable. Examples: module.exports = function build() {,
+#   Foo.prototype.legacyMethod = function() {, handleClick = (ev) => {.
+#
+# - Rule 5 — methods. Class and object-shorthand methods: optional static/async/get/set modifiers, optional generator *,
+#   name may be #private or computed [...], and the line must end with ) {. Examples: constructor(opts) {, async
+#   *stream() {, [Symbol.iterator]() {, remove(id) {.
+#
+# - Rule 6 — property-bound functions. Object-literal properties (name optionally quoted) whose value is a function or
+#   arrow. Examples: fetchAll: async () => {, save: function(data) {.
+#
+# - Rule 7 — callback registrations. A (possibly dotted) call that ends the line with { and contains => or function in
+#   its arguments. Examples:
+#     - describe('math', () => {
+#     - router.get('/users', async (req, res) => {
+#     - setTimeout(function() {
+#
+# - Rule 8 — IIFEs. Lines opening with ( followed by a function expression or another (:
+#   Example: (function wrap() {, (async () => {.
+#
+#  Ordering matters in two ways: the veto must precede everything, and the specific shapes (2–6) come before the loose
+#  catch-alls (7–8) so a line like remove(id) { is labeled as a method rather than a call.
+#
+*.[jJ][sS]                                          diff=javascript
+# Json diff requires an external tool. Make sure to run:
+#
+#     git config --global diff.json.xfuncname '^[ \t]*("[^"]+"[ \t]*:[ \t]*[{[]).*$'
+#     git config --global diff.json.wordRegex '"([^"\\]|\\.)*"|[-0-9.eE+]+|true|false|null|[{}[\]:,]'
+#
+*.[jJ][sS][oO][nN]                                  diff=json
+#
+*.[tT][sS]                                          diff=typescript
+
+###
+#  Precompiled C/C++ Headers
+#
+*.[gG][cC][hH]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[pP][cC][hH]                      filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+#  Precompiled Lua
+*.[lL][jJ][bB][cC]                  filter=lfs      diff=lfs            merge=lfs   -text
+*.[bB][cC]                          filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# Graphics
+#
+*.[bB][mM][pP]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[eE][xX][rR]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[gG][iI][fF]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[hH][dD][rR]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[iI][fF][fF]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[jJ][pP][eE][gG]                  filter=lfs      diff=lfs            merge=lfs   -text
+*.[jJ][pP][gG]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[pP][iI][cC][tT]                  filter=lfs      diff=lfs            merge=lfs   -text
+*.[pP][nN][gG]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[pP][sS][dD]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[tT][gG][aA]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[tT][iI][fF]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[tT][iI][fF][fF]                  filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# Fonts
+#
+*.[tT][tT][fF]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[oO][tT][fF]                      filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# Audio
+#
+*.[aA][iI][fF]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[aA][iI][fF][fF]                  filter=lfs      diff=lfs            merge=lfs   -text
+*.[iI][tT]                          filter=lfs      diff=lfs            merge=lfs   -text
+*.[mM][oO][dD]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[mM][pP]3                         filter=lfs      diff=lfs            merge=lfs   -text
+*.[oO][gG][gG]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[sS]3[mM]                         filter=lfs      diff=lfs            merge=lfs   -text
+*.[wW][aA][vV]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[xX][mM]                          filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# Video
+#
+*.[mM][pP]4                         filter=lfs      diff=lfs            merge=lfs   -text
+*.[mM][pP][gG]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[mM][pP][eE][gG]                  filter=lfs      diff=lfs            merge=lfs   -text
+*.[mM][oO][vV]                      filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# 3D Object
+#
+*.3[dD][mM]                         filter=lfs      diff=lfs            merge=lfs   -text
+*.3[dD][sS]                         filter=lfs      diff=lfs            merge=lfs   -text
+*.[bB][lL][eE][nN][dD]              filter=lfs      diff=lfs            merge=lfs   -text
+*.[cC]4[dD]                         filter=lfs      diff=lfs            merge=lfs   -text
+*.[cC][oO][lL][lL][aA][dD][aA]      filter=lfs      diff=lfs            merge=lfs   -text
+*.[dD][aA][eE]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[dD][xX][fF]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[fF][bB][xX]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[jJ][aA][sS]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[lL][wW][sS]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[lL][xX][oO]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[mM][aA]                          filter=lfs      diff=lfs            merge=lfs   -text
+*.[mM][aA][xX]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[mM][bB]                          filter=lfs      diff=lfs            merge=lfs   -text
+*.[oO][bB][jJ]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[pP][lL][yY]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[sS][kK][pP]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[sS][tT][lL]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[zZ][tT][lL]                      filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# Archives
+#
+*.7[zZ]                             filter=lfs      diff=lfs            merge=lfs   -text
+*.[zZ][iI][pP]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[gG][zZ]                          filter=lfs      diff=lfs            merge=lfs   -text
+*.[tT][gG][zZ]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[bB][zZ]2                         filter=lfs      diff=lfs            merge=lfs   -text
+*.[pP][yY][zZ]                      filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# Documents
+#
+*.[mM][dD]                                          diff=markdown
+*.[dD][oO][cC]                      filter=lfs      diff=astextplain    merge=lfs   -text
+*.[dD][oO][cC][xX]                  filter=lfs      diff=astextplain    merge=lfs   -text
+*.[dD][oO][tT]                      filter=lfs      diff=astextplain    merge=lfs   -text
+*.[pP][dD][fF]                      filter=lfs      diff=astextplain    merge=lfs   -text
+*.[rR][tT][fF]                      filter=lfs      diff=astextplain    merge=lfs   -text
+*.[pP][sS]                          filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# Misc Binaries
+#
+*.[eE][xX][eE]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[dD][lL][lL]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[sS][oO]                          filter=lfs      diff=lfs            merge=lfs   -text
+*.[dD][yY][lL][iI][bB]              filter=lfs      diff=lfs            merge=lfs   -text
+*.[lL][iI][bB]                      filter=lfs      diff=lfs            merge=lfs   -text
+*.[aA]                              filter=lfs      diff=lfs            merge=lfs   -text
+
+###
+# Github Linguist Settings (https://github.com/github/linguist)
+#
+.idea/**                            linguist-vendored
+.vscode/**                          linguist-vendored
+CMakeLists.txt                      linguist-vendored
+*.in                                linguist-vendored
+*.cmake                             linguist-vendored
+*.sh                                linguist-vendored
+*.bat                               linguist-vendored
+*.cmd                               linguist-vendored
+[Dd]oc/**                           linguist-documentation
+[Dd]ocs/**                          linguist-documentation
+[Dd]ocument/**                      linguist-documentation
+[Dd]ocuments/**                     linguist-documentation
+[Dd]ocumentation/**                 linguist-documentation
+[Rr]esources/**                     linguist-documentation

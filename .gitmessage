@@ -1,0 +1,19 @@
+<scope>: <short description with no trailing period> (max 70 chars)
+
+What changed and why. At least one line. Wrap at 75 chars.
+
+Close: #N
+
+# 75 chars end right here ----------------------------------------------> X
+#
+# Issue references (optional):
+#
+#   Issue: #123, #456      - reference without closing
+#   Close: #123, #456      - close on merge
+#   Reopen: #123, #456     - reopen on merge
+#
+#   (multiple lines permitted for separate actions)
+#
+# Lines starting with '#' are ignored. An empty message aborts the commit.
+#
+# A sign-off is allowed but not required.
