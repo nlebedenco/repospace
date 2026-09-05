@@ -104,8 +104,10 @@ arguments through to the underlying tool untouched.
 
 Members can provide additional commands through the `command-extensions`
 manifest attribute; `repospace help` lists the extensions available in a
-repospace, grouped by the member providing them. Command aliases are defined
-with the `alias.<name>` configuration option.
+repospace, grouped by the member providing them. See
+[docs/extensions.md](docs/extensions.md) for how to write one.
+
+Command aliases are defined with the `alias.<name>` configuration option.
 
 ## Manifest
 

@@ -1,12 +1,11 @@
 # The repospace manifest format
 
-A manifest is a YAML file, conventionally named `repospace.yaml`, with a
-single top-level `manifest` key. `repospace.yaml` is the default entry
-point everywhere: for the repospace itself, another file inside the
-manifest repository can be selected with `init --manifest`
-(recorded as the `manifest.file` configuration option), just as an
-importing manifest can name a file with `import: file:`. All sections
-are optional:
+A manifest is a YAML file, conventionally named `repospace.yaml`, with a single
+top-level `manifest` key. `repospace.yaml` is the default entry point
+everywhere: for the repospace itself, another file inside the manifest
+repository can be selected with `init --manifest` (recorded as the
+`manifest.file` configuration option), just as an importing manifest can name a
+file with `import: file:`. All sections are optional:
 
 ```yaml
 manifest:
@@ -29,46 +28,45 @@ manifest:
   group-filter: [-optional]
 ```
 
-Unknown keys are rejected everywhere. So are keys with an explicit null
-value (e.g. a `groups:` whose entries were all commented out) — remove
-the key instead; only `manifest:` and `userdata:` may be null. Empty
-strings are rejected wherever a value would otherwise silently fall
-back to a default or change meaning (`name`, `remote`, `repo-path`,
-`url`, `path`, `revision`, `remotes` entries, `import` paths,
-`import: file:`, and the `path-allowlist`/`path-blocklist` patterns).
+Unknown keys are rejected everywhere. So are keys with an explicit null value
+(e.g. a `groups:` whose entries were all commented out) — remove the key
+instead; only `manifest:` and `userdata:` may be null. Empty strings are
+rejected wherever a value would otherwise silently fall back to a default or
+change meaning (`name`, `remote`, `repo-path`, `url`, `path`, `revision`,
+`remotes` entries, `import` paths, `import: file:`, and the
+`path-allowlist`/`path-blocklist` patterns).
 
 A machine-readable JSON Schema of this format is at
 [scripts/schemas/repospace-manifest-schema.json](../scripts/schemas/repospace-manifest-schema.json).
 
 ## version
 
-The minimum schema version required to parse the file, as a string
-(quote it — YAML would otherwise parse `1.0` as a number, which is
-tolerated but warned about in errors). The current schema version is
-`1.0`. A manifest declaring a newer version than the running repospace
-supports fails with an error asking to upgrade repospace. The version is
-checked per file, including imported ones, before anything else.
+The minimum schema version required to parse the file, as a string (quote it —
+YAML would otherwise parse `1.0` as a number, which is tolerated but warned
+about in errors). The current schema version is `1.0`. A manifest declaring a
+newer version than the running repospace supports fails with an error asking to
+upgrade repospace. The version is checked per file, including imported ones,
+before anything else.
 
 ## defaults
 
 - `remote`: remote used by members that give neither `remote` nor `url`.
-- `revision`: revision for members without one (default: `main`). Like
-  every revision, it must not begin with `-`: git refnames cannot, and
-  such a value would be read as a command-line option.
+- `revision`: revision for members without one (default: `main`). Like every
+  revision, it must not begin with `-`: git refnames cannot, and such a value
+  would be read as a command-line option.
 
-`defaults` and `remotes` apply only to the file that contains them; they
-are never inherited across imports.
+`defaults` and `remotes` apply only to the file that contains them; they are
+never inherited across imports.
 
 ## remotes
 
-Named URL prefixes. Each entry needs `name` and `url-base`; names must
-be unique within the file. A member using a remote gets the fetch URL
-`url-base + "/" + (repo-path or name)`; trailing slashes on `url-base`
-are dropped.
+Named URL prefixes. Each entry needs `name` and `url-base`; names must be unique
+within the file. A member using a remote gets the fetch URL
+`url-base + "/" + (repo-path or name)`; trailing slashes on `url-base` are
+dropped.
 
-Remote names are manifest-internal identifiers for URL prefixes: in a
-cloned member the git remote is always named `origin`, however the URL
-was declared.
+Remote names are manifest-internal identifiers for URL prefixes: in a cloned
+member the git remote is always named `origin`, however the URL was declared.
 
 ## members
 
@@ -91,72 +89,64 @@ Each entry accepts:
 | `groups`             | list             | `[]`                | Group membership (mutually exclusive with `import`)                                                                  |
 | `userdata`           | any              | none                | Ignored by repospace                                                                                                 |
 
-Member paths are confined to the repospace: absolute paths, drive
-letters, `..` escapes, `.git` path components (in any case — member
-content must never act as a git directory), and placement inside
-`.repospace/` are rejected lexically. A path is normalized before it is
-used, so `libs/x/../y` *is* `libs/y` — that is the placement, and the
-form re-emitted by `manifest --resolve`; a path that normalizes to the
-repospace top itself (or, in an imported manifest, to its `path-prefix`
-directory) is rejected.
+Member paths are confined to the repospace: absolute paths, drive letters, `..`
+escapes, `.git` path components (in any case — member content must never act as
+a git directory), and placement inside `.repospace/` are rejected lexically. A
+path is normalized before it is used, so `libs/x/../y` *is* `libs/y` — that is
+the placement, and the form re-emitted by `manifest --resolve`; a path that
+normalizes to the repospace top itself (or, in an imported manifest, to its
+`path-prefix` directory) is rejected.
 
-Member checkouts live in real directories inside the repospace: no
-existing component of a member path below the repospace top may be a
-symbolic link — the member's own directory included — so that neither a
-link committed in a member nor one committed in the manifest repository
-can redirect a checkout elsewhere. Components that do not exist yet are
-fine; `update` creates them as directories. The repospace top itself,
-and anything above it, may be a symlink: that placement is the user's
-own doing, not something manifest data can steer.
+Member checkouts live in real directories inside the repospace: no existing
+component of a member path below the repospace top may be a symbolic link — the
+member's own directory included — so that neither a link committed in a member
+nor one committed in the manifest repository can redirect a checkout elsewhere.
+Components that do not exist yet are fine; `update` creates them as directories.
+The repospace top itself, and anything above it, may be a symlink: that
+placement is the user's own doing, not something manifest data can steer.
 
 ## self
 
-Attributes of the manifest repository itself: `name`,
-`command-extensions`, `cmake-packages`, `import`, and `userdata`.
+Attributes of the manifest repository itself: `name`, `command-extensions`,
+`cmake-packages`, `import`, and `userdata`.
 
-`name` is a *suggested clone-directory name*, used only by
-`repospace init` when it clones a manifest repository and no
-DIRECTORY argument is given (like the
-directory name `git clone` derives from the URL, which is also the
-fallback when `name` is absent). It must be a single plain path
-component that does not start with a dot — the manifest author may
-suggest a name, but only the caller decides placement on their
-filesystem, and the author must not create hidden or git-confusing
-directories (`.git`, `.repospace`) there. After cloning, `name` is
+`name` is a *suggested clone-directory name*, used only by `repospace init` when
+it clones a manifest repository and no DIRECTORY argument is given (like the
+directory name `git clone` derives from the URL, which is also the fallback when
+`name` is absent). It must be a single plain path component that does not start
+with a dot — the manifest author may suggest a name, but only the caller decides
+placement on their filesystem, and the author must not create hidden or
+git-confusing directories (`.git`, `.repospace`) there. After cloning, `name` is
 never consulted again.
 
 ### Git hygiene
 
-The repospace metadata and the members live inside (or beside) the
-manifest repository, so its `.gitignore` should normally include
-`.repospace/` plus the prefixes where members are placed. Keeping all
-member paths under one prefix makes this a single entry — for example
-`external/` when the manifest declares (or self-imports with
-`path-prefix: external`) its members there.
+The repospace metadata and the members live inside (or beside) the manifest
+repository, so its `.gitignore` should normally include `.repospace/` plus the
+prefixes where members are placed. Keeping all member paths under one prefix
+makes this a single entry — for example `external/` when the manifest declares
+(or self-imports with `path-prefix: external`) its members there.
 
 ## Imports
 
 A manifest can import other manifests:
 
 - from the manifest repository itself (`self: import:`) — read from the
-  filesystem, relative to the manifest repository root; paths must stay
-  inside the repository (no absolute paths, no escaping via `..` or
-  symlinks);
-- from a member (`members: - import:`) — a path inside the member, with
-  the same confinement (no absolute paths, no `..` escapes) — read from
-  git at
+  filesystem, relative to the manifest repository root; paths must stay inside
+  the repository (no absolute paths, no escaping via `..` or symlinks);
+- from a member (`members: - import:`) — a path inside the member, with the same
+  confinement (no absolute paths, no `..` escapes) — read from git at
   `refs/heads/repospace-rev`, i.e. the member's state as of the last
-  `repospace update`. During `update`, the member is cloned and fetched
-  the moment its manifest data is needed, so resolution always sees
-  fresh data. A `self: import:` inside a manifest read from a member is
-  resolved the same way — from the member's `repospace-rev`, never from
-  its working tree.
+  `repospace update`. During `update`, the member is cloned and fetched the
+  moment its manifest data is needed, so resolution always sees fresh data. A
+  `self: import:` inside a manifest read from a member is resolved the same way
+  — from the member's `repospace-rev`, never from its working tree.
 
 Manifest data is never read through a symbolic link, by either route: an
-imported file (or a `.yml`/`.yaml` file inside an imported directory)
-that is a link is an error. Git stores a link as a file whose content is
-its target, so following one on the filesystem would make the same
-repository resolve differently depending on where it was read from.
+imported file (or a `.yml`/`.yaml` file inside an imported directory) that is a
+link is an error. Git stores a link as a file whose content is its target, so
+following one on the filesystem would make the same repository resolve
+differently depending on where it was read from.
 
 Accepted forms:
 
@@ -176,78 +166,61 @@ import:                       # a sequence of any of the above
   - file: two.yaml
 ```
 
-Filter semantics: names match exactly; path patterns match from the
-right (`foo` matches `a/b/foo`) and must name at least one path
-component (`''` and `.` are rejected). A member matched by an allowlist
-is imported even if a blocklist also matches. With no allowlist,
-everything not blocklisted is imported; with an allowlist, only listed
-entries are.
-Filters compose down the import tree — a nested import can only narrow
-what its parent allowed. `path-prefix` accumulates by path joining and
-applies only to the imported content; the importing member's own
-placement comes from its `path` attribute. `true` and `false` are not
+Filter semantics: names match exactly; path patterns match from the right (`foo`
+matches `a/b/foo`) and must name at least one path component (`''` and `.` are
+rejected). A member matched by an allowlist is imported even if a blocklist also
+matches. With no allowlist, everything not blocklisted is imported; with an
+allowlist, only listed entries are. Filters compose down the import tree — a
+nested import can only narrow what its parent allowed. `path-prefix` accumulates
+by path joining and applies only to the imported content; the importing member's
+own placement comes from its `path` attribute. `true` and `false` are not
 allowed under `self: import:`.
 
 ### Precedence
 
-Resolution order is: members imported from `self: import:` first, then
-this file's `members:`, then member imports in declaration order. The
-first definition of a member name wins; later definitions are ignored,
-and an ignored definition's `import:` is never processed. So self-imports
-override the top-level file, which overrides member imports — dropping an
-override file into a self-imported directory (its name sorts first)
-overrides everything.
+Resolution order is: members imported from `self: import:` first, then this
+file's `members:`, then member imports in declaration order. The first
+definition of a member name wins; later definitions are ignored, and an ignored
+definition's `import:` is never processed. So self-imports override the
+top-level file, which overrides member imports — dropping an override file into
+a self-imported directory (its name sorts first) overrides everything.
 
 Import cycles are rejected with the cycle spelled out ("import cycle:
-repospace.yaml -> a.yaml -> b.yaml -> a.yaml"). Importing the same file
-on two sibling branches (a diamond) is legal; duplicate members are
-handled by first-definition-wins. Deeply nested non-cyclic imports fail
-with "import level too deep".
+repospace.yaml -> a.yaml -> b.yaml -> a.yaml"). Importing the same file on two
+sibling branches (a diamond) is legal; duplicate members are handled by
+first-definition-wins. Deeply nested non-cyclic imports fail with "import level
+too deep".
 
-### group-filter
+## group-filter
 
-A list of `+group`/`-group` entries; `-` disables a group by default. A
-member is inactive when all of its groups are disabled; inactive members
-are skipped by `update` and hidden from default `list` output. Filters
-from imported manifests apply with lower precedence than the importing
-file; self-imported filters have the highest. The
-`manifest.group-filter` configuration option and `update --group-filter`
-apply on top of everything.
+A list of `+group`/`-group` entries; `-` disables a group by default. A member
+is inactive when all of its groups are disabled; inactive members are skipped by
+`update` and hidden from default `list` output. Filters from imported manifests
+apply with lower precedence than the importing file; self-imported filters have
+the highest. The `manifest.group-filter` configuration option and
+`update --group-filter` apply on top of everything.
 
 ## Extension commands
 
-`command-extensions` names a YAML file (relative to the member root, or
-to the manifest repository root under `self:`):
-
-```yaml
-command-extensions:
-  - file: scripts/my_extension.py
-    commands:
-      - name: my-command
-        class: MyCommand      # optional, defaults to the name
-        help: one-line help   # optional
-```
-
-`file` is also relative to the member root. The Python file is imported
-only when the command is invoked. The class must subclass
-`repospace.commands.RepospaceCommand`, take no constructor arguments, and
-implement `do_add_parser(self, parser_adder)` and
-`do_run(self, args, unknown)`. Built-in names cannot be overridden; when
-two members provide the same command name, the member earlier in
-resolution order wins.
+`command-extensions` names one YAML specification file, or a list of them,
+relative to the member root (or to the manifest repository root under `self:`).
+Each file declares Python files inside the same repository and the command
+classes they provide; the Python files are imported only when a command is run
+or its help is requested. Built-in names cannot be overridden; when two members
+provide the same command name, the member earlier in resolution order wins.
+See [extensions.md](extensions.md) for the specification format and how to
+write a command.
 
 When a manifest imported from a member declares `command-extensions` (or
-`cmake-packages`) under its own `self:` section, those values are
-attributed to that member.
+`cmake-packages`) under its own `self:` section, those values are attributed to
+that member.
 
 ## cmake-packages
 
-Lists CMake package names exposed by a member (or by the manifest
-repository under `self:`). Package names may only contain letters,
-digits, and `._+-` (and must not start with punctuation), because they
-are interpolated into generated CMake code. On every `update`,
-repospace writes
-`.repospace/packages.cmake`, which sets `ENV{<name>_ROOT}` to the
-declaring member's absolute path for every declared package (first
-declaration wins), plus `.repospace/members.json` with all resolved
-member data. See the README for the CMake workflow.
+Lists CMake package names exposed by a member (or by the manifest repository
+under `self:`). Package names may only contain letters, digits, and `._+-` (and
+must not start with punctuation), because they are interpolated into generated
+CMake code. On every `update`, repospace writes `.repospace/packages.cmake`,
+which sets `ENV{<name>_ROOT}` to the declaring member's absolute path for every
+declared package (first declaration wins), plus `.repospace/members.json` with
+all resolved member data. See the README for the CMake workflow.
