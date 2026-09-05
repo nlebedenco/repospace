@@ -1,4 +1,4 @@
-# repospace
+# Repospace
 
 A command line tool for managing multi-repository workspaces.
 
@@ -74,7 +74,7 @@ recursively, according to the import rules) into its declared subdirectory,
 points it at the manifest revision with a detached `HEAD`, and records that
 revision in the repospace-owned branch `repospace-rev` of each member. Members
 are cloned with `git init` plus `git remote add`, never `git clone`, and
-repospace claims only the `repospace-rev` branch and the `origin` remote name.
+Repospace claims only the `repospace-rev` branch and the `origin` remote name.
 
 Never commit `.repospace/`; `init` refuses a clone that contains it. Add it and
 the member locations (`external/` in the example above) to the manifest
@@ -218,3 +218,63 @@ bootstrap has created `.venv`. The selection goes through the
 in `.vscode/extensions.json`. Only terminals opened after the task has finished
 have the venv activated. To repeat the sequence later, run "Project: Reload"
 from Terminal > Run Task.
+
+## Relationship to Zephyr West
+
+Repospace is a re-implementation of the multi-repository model of
+[West](https://docs.zephyrproject.org/latest/develop/west/index.html), the
+meta-tool of the Zephyr RTOS project. Anyone who has used West will recognize
+the commands, the option names, and the manifest sections. But Repospace is not
+a fork of West. It is a separate code base that follows West's design while
+staying completely agnostic to the user project type - nothing in it knows about
+or depends on Zephyr.
+
+### Functional parallel
+
+| Concept               | West                                                                                                                  | Repospace                                                 |
+|-----------------------|-----------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
+| Manifest file         | `west.yml`                                                                                                            | `repospace.yaml`                                          |
+| Tool directory        | `.west/`                                                                                                              | `.repospace/`                                             |
+| Managed repositories  | `projects`                                                                                                            | `members`                                                 |
+| Manifest sections     | `version`, `defaults`, `remotes`, `self`, `group-filter`                                                              | same names                                                |
+| Repository attributes | `name`, `path`, `url`, `remote`, `repo-path`, `revision`, `clone-depth`, `groups`, `submodules`, `userdata`, `import` | same names                                                |
+| Recursive imports     | `import` with `name-allowlist`, `name-blocklist`, `path-allowlist`, `path-blocklist`, `path-prefix`                   | same names                                                |
+| Group filters         | manifest `group-filter` plus the `manifest.group-filter` option                                                       | same                                                      |
+| Revision bookkeeping  | branch `manifest-rev`, detached `HEAD`                                                                                | branch `repospace-rev`, detached `HEAD`                   |
+| Extension commands    | `west-commands` attribute, `west-commands.yml`                                                                        | `command-extensions` attribute, `repospace-commands.yaml` |
+| Configuration         | git-style INI at system, global and local levels                                                                      | same, with `REPOSPACE_CONFIG_*` overrides                 |
+| Built-in commands     | `init`, `update`, `list`, `manifest`, `compare`, `diff`, `status`, `forall`, `grep`, `config`, `topdir`, `help`       | same set                                                  |
+| Command options       | `--freeze`, `--resolve`, `--validate`, `--narrow`, `--rebase`, `--keep-descendants`, `--group-filter`, `--fetch`      | same names                                                |
+
+### Main differences
+
+| Aspect              | West                                                                                                                                                                       | Repospace                                                                                                          |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| Target project      | Zephyr: `-z/--zephyr-base`, the `zephyr.base` options, and `ZEPHYR_BASE` exported at startup; `build`, `flash` and `debug` are extensions shipped by the Zephyr repository | any project; the only build-system knowledge is the generated CMake files                                          |
+| Layout              | `topdir/manifest.path/manifest.file`: the manifest repository is cloned into a workspace directory that holds `.west/`                                                     | colocated: the manifest repository is the root and holds `.repospace/`; `init` also works inside an existing clone |
+| Build integration   | none in West itself                                                                                                                                                        | `update` generates `packages.cmake` and `members.json`, guarded by `REPOSPACE_UPDATE_HASH`                         |
+| Default revision    | `master`                                                                                                                                                                   | `main`                                                                                                             |
+| Manifest validation | pykwalify schema                                                                                                                                                           | built-in validation, plus a JSON Schema for editors                                                                |
+| Dependencies        | colorama, packaging, pykwalify, PyYAML; Python >= 3.10                                                                                                                     | PyYAML; Python >= 3.9                                                                                              |
+| Not carried over    | `selfupdate`, name and path caches, `manifest.path`, `manifest.project-filter`                                                                                             |                                                                                                                    |
+
+### Motivation
+
+- **Decoupling from Zephyr.** West is maintained as the Zephyr meta-tool: its
+  documentation is part of the Zephyr documentation, its startup path
+  resolves `ZEPHYR_BASE` and it provides an API specifically for Zephyr to
+  locate its modules. A project that only needs to assemble git repositories
+  from a manifest gets that model here without any ties to the RTOS.
+
+- **CMake integration without extensions.** Members declare the CMake packages
+  they provide and `repospace update` generates files a top-level
+  `CMakeLists.txt` can consume to locate those packages. No extension command
+  layer, no package pre-registration on the host system.
+
+- **The project root is the repospace root.** A checkout of the manifest
+  repository plus `repospace init` is the whole setup; there is no separate
+  top directory to create or to keep in sync. Nothing escapes the project root.
+
+- **Familiarity.** Commands, options, manifest sections and configuration keys
+  keep West's names, so West users have nothing new to learn and existing
+  manifests migrate with the edits listed above.
