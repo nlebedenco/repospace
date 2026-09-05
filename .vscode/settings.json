@@ -1,0 +1,209 @@
+{
+  "[git-commit]": {
+    "editor.rulers": [
+      75
+    ]
+  },
+  "[ini]": {
+    "editor.rulers": [
+      100
+    ]
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.rulers": [
+      80
+    ]
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "[toml]": {
+    "editor.rulers": [
+      100
+    ]
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "better-todo-tree.general.statusBar": "tags",
+  "better-todo-tree.filtering.excludeGlobs": [
+    "**/.build",
+    "**/.git",
+    "**/.venv",
+    "**/node_modules/**",
+    "**/__pycache__"
+  ],
+  "better-todo-tree.filtering.useBuiltInExcludes": "file and search excludes",
+  "better-todo-tree.tree.autoRefresh": true,
+  "better-todo-tree.tree.hideTreeWhenEmpty": false,
+  "better-todo-tree.tree.scanMode": "workspace",
+  "better-todo-tree.tree.showCurrentScanMode": false,
+  "better-todo-tree.tree.trackFile": false,
+  "better-todo-tree.tree.buttons.scanMode": false,
+  "better-todo-tree.regex.subTagRegex": "\\*/",
+  "black-formatter.args": [
+    "${workspaceFolder}/pyproject.toml"
+  ],
+  "black-formatter.importStrategy": "useBundled",
+  // Specify file types to spell check.
+  "cSpell.enabledFileTypes": {
+    "*": true
+  },
+  // Specify paths/files to ignore.
+  "cSpell.ignorePaths": [
+    "**/.build",
+    "**/.git",
+    "**/.venv",
+    "**/node_modules",
+    "**/__pycache__",
+    "*.patch",
+    "*.json"
+  ],
+  "cSpell.languageSettings": [
+    {
+      "languageId": "python",
+      "includeRegExpList": [
+        "/#.*/",
+        "/('''|\"\"\")[^\\1]+?\\1/g",
+        "strings"
+      ]
+    },
+    {
+      "languageId": "cmake,properties,yaml",
+      "includeRegExpList": [
+        "/#.*/",
+        "strings"
+      ]
+    },
+    {
+      "languageId": "javascript,typescript",
+      "includeRegExpList": [
+        "CStyleComment",
+        "strings"
+      ]
+    }
+  ],
+  // Keep this list in (case-insensitive) alphabetical order
+  "cSpell.words": [
+    "abspath",
+    "behaviour",
+    "blocklist",
+    "blocklisted",
+    "distutils",
+    "gitlint",
+    "gitmessage",
+    "Lebedenco",
+    "Nicolas",
+    "nodeenv",
+    "NTFS",
+    "pyproject",
+    "pytest",
+    "repospace",
+    "repospaces",
+    "riscv",
+    "setuptools",
+    "subfolders",
+    "subsys",
+    "topdir",
+    "venv",
+    "wrappable"
+  ],
+  "debug.onTaskErrors": "abort",
+  "debug.openDebug": "openOnSessionStart",
+  "debug.showInStatusBar": "never",
+  "debug.toolBarLocation": "docked",
+  "editor.rulers": [
+    120
+  ],
+  "files.associations": {
+    ".gitlint": "toml",
+    ".gitmessage": "plaintext",
+    // Claude Code extension takes ownership of files it recognizes as skill
+    // definitions and sets those files' language mode to "skill" instead of
+    // "markdown" creating a problem for formatter/linters. Force markdown
+    // explicitly so [markdown]'s editor.defaultFormatter/editor.rulers apply.
+    "**/SKILL.md": "markdown"
+  },
+  // Core VSCode file watcher/search excludes. Mirrors the exclude lists already
+  // used by python.analysis.exclude, cSpell.ignorePaths and better-todo-tree
+  // below, which scope their own tools but not the engine's file watcher or
+  // search/quick-open indexer.
+  "files.watcherExclude": {
+    "**/.build*": true,
+    "**/.lock*": true,
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/__pycache__": true
+  },
+  "git.ignoreLimitWarning": true,
+  "json.format.keepLines": false,
+  "macros.startupMacros": [
+    "${workspaceFolder}/.vscode/macros/select-venv.js"
+  ],
+  "python.analysis.exclude": [
+    "**/.*",
+    "**/.venv",
+    "**/node_modules",
+    "**/__pycache__"
+  ],
+  "python.terminal.activateEnvInCurrentTerminal": false,
+  "python.terminal.activateEnvironment": false, // superseded by python-envs.terminal.autoActivationType in user settings.json
+  "python.terminal.shellIntegration.enabled": false,
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "python.useEnvironmentsExtension": true,
+  "search.exclude": {
+    "**/.build*": true,
+    "**/.lock*": true,
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/__pycache__": true
+  },
+  "task.autoDetect": "off",
+  "task.quickOpen.history": 0,
+  "terminal.integrated.environmentChangesRelaunch": false,
+  "terminal.integrated.hideOnStartup": "whenEmpty",
+  "terminal.integrated.profiles.windows": {
+    "Shell": {
+      "path": [
+        "${env:windir}\\Sysnative\\cmd.exe",
+        "${env:windir}\\System32\\cmd.exe"
+      ],
+      "icon": "terminal",
+      "overrideName": true
+    },
+  },
+  "terminal.integrated.profiles.linux": {
+    "Shell": {
+      "path": "bash",
+      "icon": "terminal",
+      "overrideName": true
+    },
+  },
+  "terminal.integrated.profiles.osx": {
+    "Shell": {
+      "path": "zsh",
+      "icon": "terminal",
+      "overrideName": true
+    },
+  },
+  "terminal.integrated.defaultProfile.linux": "Shell",
+  "terminal.integrated.defaultProfile.windows": "Shell",
+  "terminal.integrated.defaultProfile.osx": "Shell",
+  "terminal.integrated.enablePersistentSessions": false,
+  "terminal.integrated.persistentSessionReviveProcess": "never",
+  "yaml.extension.recommendations": false,
+  "yaml.format.printWidth": 120,
+  "yaml.schemas": {
+    "scripts/schemas/repospace-manifest-schema.json": [
+      "repospace.yaml"
+    ]
+  },
+  "macros.sourceDirectories": [
+    "${workspaceFolder}/.vscode/macros"
+  ]
+}
