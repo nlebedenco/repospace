@@ -1,0 +1,3 @@
+# Files added to the source distribution beyond what setuptools includes by default.
+# setuptools ships tests/test_*.py on its own but not the fixtures they need.
+include tests/conftest.py
