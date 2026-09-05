@@ -5,22 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "repospace"
 dynamic = ["version"]
-description = "A command line tool for managing multi-repository spaces"
+description = "A command line tool for managing multi-repository workspaces"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [{ name = "Nicolas Lebedenco", email = "nicolas@lebedenco.net" }]
 keywords = ["cli", "repospace", "multi-repo", "manifest", "cmake"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
 ]
 dependencies = ["PyYAML>=6.0"]
 

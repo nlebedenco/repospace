@@ -18,7 +18,7 @@ pip install repospace
 
 **Host system requirements:**
 
-- Python >= 3.9
+- Python >= 3.12
 - git
 
 ## Quick start
@@ -255,7 +255,7 @@ or depends on Zephyr.
 | Build integration   | none in West itself                                                                                                                                                        | `update` generates `packages.cmake` and `members.json`, guarded by `REPOSPACE_UPDATE_HASH`                         |
 | Default revision    | `master`                                                                                                                                                                   | `main`                                                                                                             |
 | Manifest validation | pykwalify schema                                                                                                                                                           | built-in validation, plus a JSON Schema for editors                                                                |
-| Dependencies        | colorama, packaging, pykwalify, PyYAML; Python >= 3.10                                                                                                                     | PyYAML; Python >= 3.9                                                                                              |
+| Dependencies        | colorama, packaging, pykwalify, PyYAML; Python >= 3.10                                                                                                                     | PyYAML; Python >= 3.12                                                                                             |
 | Not carried over    | `selfupdate`, name and path caches, `manifest.path`, `manifest.project-filter`                                                                                             |                                                                                                                    |
 
 ### Motivation
