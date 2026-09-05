@@ -61,6 +61,23 @@ def test_full_update(repospace, run_repospace):
     assert git_out(ws / "liba", "for-each-ref", "refs/repospace") == ""
 
 
+def test_refspec_in_revision_is_refused_before_any_fetch(repospace, run_repospace):
+    # A manifest revision is fetched as a refspec; "main:refs/heads/work"
+    # would force-update the member's local "work" branch to the
+    # remote's main. Validation refuses it before git is involved.
+    repospace.rewrite_app_yaml(
+        extra_members=(
+            "    - name: lw\n"
+            f"      url: {repospace.url(repospace.libc_src)}\n"
+            "      revision: 'main:refs/heads/work'\n"
+        )
+    )
+    out, err = update(run_repospace, repospace, expect=1)
+    assert "cannot resolve the manifest" in err
+    assert "contains ':'" in err
+    assert not (repospace.ws / "lw").exists()
+
+
 def test_generate_write_failure_fails_cleanly(repospace, run_repospace):
     # A repospace-file write failure must surface as a clean error,
     # not a traceback.

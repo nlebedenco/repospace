@@ -52,8 +52,12 @@ before anything else.
 
 - `remote`: remote used by members that give neither `remote` nor `url`.
 - `revision`: revision for members without one (default: `main`). Like every
-  revision, it must not begin with `-`: git refnames cannot, and such a value
-  would be read as a command-line option.
+  revision, it must be a plausible git refname or commit SHA: no leading `-`
+  or `+`, and none of the characters a refname cannot contain (whitespace,
+  `~`, `^`, `:`, `?`, `*`, `[`, `\`, `..`, `@{`). A revision is passed to git
+  as a fetch refspec and as a revision argument, where each of those has a
+  meaning of its own; a `:` would make `update` move a local branch of the
+  member.
 
 `defaults` and `remotes` apply only to the file that contains them; they are
 never inherited across imports.
@@ -79,7 +83,7 @@ Each entry accepts:
 | `remote`             | string           | `defaults.remote`   | Named remote for the fetch URL                                                                                       |
 | `repo-path`          | string           | `name`              | Suffix appended to the remote's `url-base`                                                                           |
 | `url`                | string           | derived             | Complete fetch URL (mutually exclusive with `remote`/`repo-path`)                                                    |
-| `revision`           | string           | `defaults.revision` | Branch, tag, or commit SHA (never begins with `-`)                                                                   |
+| `revision`           | string           | `defaults.revision` | Branch, tag, or commit SHA (refname-safe: no leading `-`/`+`, no `~^:?*[\`, whitespace, `..`, `@{`)                  |
 | `path`               | string           | `name`              | Checkout path relative to the repospace top (POSIX separators; must stay inside the repospace; no `.git` components) |
 | `submodules`         | bool or list     | `false`             | `true` = update all recursively; or a list of `{path, name}`                                                         |
 | `clone-depth`        | positive int     | none                | Passed to `git fetch --depth`                                                                                        |
@@ -144,7 +148,8 @@ A manifest can import other manifests:
 
 Manifest data is never read through a symbolic link, by either route: an
 imported file (or a `.yml`/`.yaml` file inside an imported directory) that is a
-link is an error. Git stores a link as a file whose content is its target, so
+link is an error, and so is a link anywhere on the path to it below the
+repository root. Git stores a link as a file whose content is its target, so
 following one on the filesystem would make the same repository resolve
 differently depending on where it was read from.
 

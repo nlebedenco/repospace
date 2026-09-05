@@ -367,6 +367,29 @@ def test_member_import_path_escape_rejected(block, fragment):
     assert fragment in str(excinfo.value)
 
 
+def test_member_import_path_is_normalized_before_reading():
+    # The importer (and git, on the direct route) is asked for the
+    # normalized path, as the self-import route and the cycle check
+    # already use: git does not normalize an inner ".." in a
+    # <rev>:<path> spec, and the failure would be reported as a stale
+    # repospace-rev, advising an update that cannot help.
+    manifest = load(
+        "manifest:\n  members:\n    - name: child\n      url: u\n      import: sub/../conf/./x.yaml\n",
+        {("child", "conf/x.yaml"): "manifest:\n  members:\n    - name: dep\n      url: u/dep\n"},
+    )
+    assert names(manifest) == ["manifest", "child", "dep"]
+
+
+def test_member_import_with_inner_dotdot_read_from_git(repos):
+    repo = repos.create("child", {"conf/x.yaml": "manifest:\n  members:\n    - name: dep\n      url: u/dep\n"})
+    repos.branch(repo, MANIFEST_REV)
+    manifest = Manifest.from_data(
+        "manifest:\n  members:\n    - name: child\n      url: u\n      import: sub/../conf/x.yaml\n",
+        topdir=str(repos.base),
+    )
+    assert names(manifest) == ["manifest", "child", "dep"]
+
+
 def test_duplicate_name_rejected_even_when_filtered():
     # A file declaring the same name twice is malformed regardless of
     # which occurrences an importing manifest's filter keeps.
@@ -661,6 +684,24 @@ def test_self_import_symlink_inside_repository_rejected(tmp_path, target):
     assert "symlinked manifest data is not allowed" in str(excinfo.value)
 
 
+@pytest.mark.parametrize("imp", ["link/inner.yaml", "link/conf", "link/./inner.yaml"])
+def test_self_import_through_symlinked_directory_rejected(tmp_path, imp):
+    # Only the imported file used to be checked; a linked directory on
+    # the way to it was followed, while the git route cannot resolve
+    # such a path at all. Every component below the repository root
+    # counts, so both routes agree about the same repository.
+    (tmp_path / "real" / "conf").mkdir(parents=True)
+    (tmp_path / "real" / "inner.yaml").write_text("manifest:\n  members:\n    - name: x\n      url: u\n")
+    (tmp_path / "real" / "conf" / "a.yaml").write_text("manifest:\n")
+    os.symlink("real", tmp_path / "link")
+    top = tmp_path / "repospace.yaml"
+    top.write_text(f"manifest:\n  self:\n    import: {imp}\n")
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_file(top)
+    assert "link is a symbolic link" in str(excinfo.value)
+    assert "symlinked manifest data is not allowed" in str(excinfo.value)
+
+
 def test_self_import_missing_file(tmp_path):
     top = tmp_path / "repospace.yaml"
     top.write_text("manifest:\n  self:\n    import: ghost.yaml\n")
@@ -754,6 +795,34 @@ def test_ignore_flag_skips_all_imports(tmp_path):
     manifest = Manifest.from_file(top, import_flags=ImportFlag.IGNORE)
     assert names(manifest) == ["manifest", "child"]
     assert not manifest.has_imports
+
+
+@pytest.mark.parametrize(
+    "text,fragment",
+    [
+        ("manifest:\n  members:\n    - name: a\n      url: u\n      import: 5\n", "invalid import 5 of type int"),
+        (
+            "manifest:\n  members:\n    - name: a\n      url: u\n      import: [false]\n",
+            'falsy "import" inside a sequence',
+        ),
+        ("manifest:\n  members:\n    - name: a\n      url: u\n      import: ''\n", "is empty"),
+        (
+            "manifest:\n  members:\n    - name: a\n      url: u\n      import:\n        file: 5\n",
+            '"file" is not a string',
+        ),
+        ("manifest:\n  self:\n    import: 5\n", "has invalid type int"),
+        ("manifest:\n  self:\n    import: true\n", "of boolean"),
+        ("manifest:\n  self:\n    import: ['']\n", "is empty"),
+        ("manifest:\n  self:\n    import:\n      bogus: 1\n", "invalid import contents"),
+    ],
+)
+def test_import_values_are_validated_when_imports_are_ignored(text, fragment):
+    # "manifest --validate" does not follow imports; an import value of
+    # the wrong shape must still fail there, not only on the next real
+    # load.
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data(text, import_flags=ImportFlag.IGNORE)
+    assert fragment in str(excinfo.value)
 
 
 def test_ignore_members_still_resolves_self_imports(tmp_path):

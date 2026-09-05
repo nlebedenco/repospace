@@ -144,6 +144,47 @@ def test_leading_dash_revision_rejected(text):
     assert 'begins with "-"' in str(excinfo.value)
 
 
+def member_with_revision(revision):
+    return {"manifest": {"members": [{"name": "lib", "url": "u", "revision": revision}]}}
+
+
+@pytest.mark.parametrize(
+    "revision,fragment",
+    [
+        ("main:refs/heads/work", "contains ':'"),
+        ("+main", 'begins with "+"'),
+        ("refs/heads/*", "contains '*'"),
+        ("main foo", "contains ' '"),
+        ("main\tfoo", "contains '\\t'"),
+        ("main^{}", "contains '^'"),
+        ("v1~2", "contains '~'"),
+        ("a?b", "contains '?'"),
+        ("a[b", "contains '['"),
+        ("a\\b", "contains '\\\\'"),
+        ("a..b", 'contains ".."'),
+        ("main@{1}", 'contains "@{"'),
+        ("@", 'is "@"'),
+    ],
+)
+def test_refspec_and_operator_syntax_in_revision_rejected(revision, fragment):
+    # A revision reaches git as a fetch refspec and as a revision
+    # argument: "main:refs/heads/work" would move the member's local
+    # "work" branch to the remote's main, "*" fetches a pattern, "^"
+    # and "~" are revision operators. Only refname-safe strings pass.
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data(member_with_revision(revision))
+    assert fragment in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "revision",
+    ["main", "refs/heads/main", "v1.0", "feature/x-y_z", "0123abcd", "HEAD", "release/2024.01", "a+b", "x@y"],
+)
+def test_refname_safe_revisions_accepted(revision):
+    manifest = Manifest.from_data(member_with_revision(revision))
+    assert manifest.members[1].revision == revision
+
+
 @pytest.mark.parametrize(
     "body,fragment",
     [

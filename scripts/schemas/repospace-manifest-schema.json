@@ -107,10 +107,10 @@
       ]
     },
     "revision": {
-      "description": "Branch, tag, or commit SHA, always a string: quote numeric-looking revisions, or YAML mangles them (1.10 becomes 1.1). A leading \"-\" is not allowed; git refnames cannot begin with one.",
+      "description": "Branch, tag, or commit SHA, always a string: quote numeric-looking revisions, or YAML mangles them (1.10 becomes 1.1). Refname-safe only: no leading \"-\" or \"+\", and none of whitespace, ~ ^ : ? * [ \\, \"..\" or \"@{\" -- the revision is passed to git as a fetch refspec, where each of those has a meaning of its own.",
       "type": "string",
       "minLength": 1,
-      "pattern": "^[^-]"
+      "pattern": "^(?![-+]|@$)(?:(?!\\.\\.|@\\{)[^\\s~^:?*\\[\\\\\\x00-\\x1f\\x7f])+$"
     },
     "groupName": {
       "description": "Group name, always a string: no leading + or -, no whitespace, commas, or colons. Quote numeric names, or YAML mangles them (1.10 becomes 1.1).",

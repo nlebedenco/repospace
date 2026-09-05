@@ -471,6 +471,29 @@ def _check_cmake_packages(value: Any, where: str) -> None:
         )
 
 
+def _refname_defect(value: str) -> Optional[str]:
+    """Say what keeps *value* from being a git refname, or return None.
+
+    These are git-check-ref-format's character rules. A revision
+    reaches git as a fetch refspec and as a revision argument, and
+    every refused character has syntax of its own there: ":" separates
+    a refspec's source from its destination (a manifest could then
+    move any local branch of the member), "*" makes it a pattern, "^",
+    "~", ".." and "@{" are revision operators, "?", "[" and "\\" are
+    glob syntax, and whitespace or control characters split or hide
+    the argument.
+    """
+    for char in value:
+        if char in " ~^:?*[\\" or ord(char) < 0x20 or ord(char) == 0x7F:
+            return f"contains {char!r}"
+    for sequence in ("..", "@{"):
+        if sequence in value:
+            return f'contains "{sequence}"'
+    if value == "@":
+        return 'is "@"'
+    return None
+
+
 def _check_revision(value: Any, where: str) -> None:
     # Revisions are strings, never numbers: YAML mangles unquoted
     # numeric revisions (1.10 becomes the float 1.1, 0700 an octal
@@ -481,12 +504,65 @@ def _check_revision(value: Any, where: str) -> None:
             # be read as a command-line option by the git commands that
             # take a revision.
             raise MalformedManifest(f'{where}: revision "{value}" begins with "-"; this is ' "not a valid git revision")
-        if value:
-            return
-        raise MalformedManifest(f"{where}: revision is empty; remove the key or set one")
+        if value.startswith("+"):
+            # A refname may begin with "+", but a refspec beginning with
+            # "+" is a forced one for the name that follows it, so
+            # "update" would fetch a different branch than the one named.
+            raise MalformedManifest(
+                f'{where}: revision "{value}" begins with "+", which marks a forced refspec '
+                f"when it is fetched; name the branch as refs/heads/{value} instead"
+            )
+        if not value:
+            raise MalformedManifest(f"{where}: revision is empty; remove the key or set one")
+        defect = _refname_defect(value)
+        if defect is not None:
+            raise MalformedManifest(f'{where}: revision "{value}" {defect}; this is not a valid git revision')
+        return
     if value is None:
         raise MalformedManifest(f"{where}: revision has no value; remove the key or set one")
     raise MalformedManifest(f'{where}: revision "{value}" is not a string; ' "do you need to quote the value?")
+
+
+def _check_member_import(imp: Any, where: str, in_sequence: bool = False, _seen=frozenset()) -> None:
+    """Check the shape of a member "import" value without resolving it.
+
+    Mirrors the cases _import_from_member handles, so that a load
+    that does not follow imports (ImportFlag.IGNORE, as "manifest
+    --validate" uses) still rejects what a real load would.
+    """
+    if isinstance(imp, bool):
+        if in_sequence and not imp:
+            raise MalformedManifest(f'{where}: falsy "import" inside a sequence')
+    elif isinstance(imp, str):
+        if not imp:
+            raise MalformedManifest(f'{where}: "import" is empty; remove the key or set a value')
+    elif isinstance(imp, list):
+        if id(imp) in _seen:
+            raise MalformedManifest(f'{where}: "import" contains a recursive YAML alias')
+        for subimp in imp:
+            _check_member_import(subimp, where, True, _seen | {id(imp)})
+    elif isinstance(imp, dict):
+        _load_import_map(imp, where)
+    else:
+        raise MalformedManifest(f"{where}: invalid import {imp} of type {type(imp).__name__}")
+
+
+def _check_self_import(imp: Any, where: str, _seen=frozenset()) -> None:
+    """Check the shape of a "self: import" value; see _check_member_import."""
+    if isinstance(imp, bool):
+        raise MalformedManifest(f'{where}: got "self: import: {imp}" of boolean')
+    if isinstance(imp, str):
+        if not imp:
+            raise MalformedManifest(f'{where}: "self: import" is empty; remove the key or set a value')
+    elif isinstance(imp, list):
+        if id(imp) in _seen:
+            raise MalformedManifest(f'{where}: "self: import" contains a recursive YAML alias')
+        for subimp in imp:
+            _check_self_import(subimp, where, _seen | {id(imp)})
+    elif isinstance(imp, dict):
+        _load_import_map(imp, where)
+    else:
+        raise MalformedManifest(f'{where}: "self: import: {imp}" has invalid type {type(imp).__name__}')
 
 
 def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
@@ -494,7 +570,9 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
 
     *source* is YAML text or already-parsed data. Raises MalformedManifest
     or ManifestVersionError. The version is checked before anything else,
-    since future schemas may be structurally incompatible.
+    since future schemas may be structurally incompatible. Import values
+    are checked for shape here, not only when they are resolved, so a
+    load with imports disabled rejects the same manifests a full load does.
     """
     if isinstance(source, str):
         try:
@@ -601,6 +679,8 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
                     "import": 'remove the key or use "import: false"',
                 },
             )
+            if "import" in md:
+                _check_member_import(md["import"], here)
             depth = md.get("clone-depth")
             _expect(
                 depth is None or (isinstance(depth, int) and not isinstance(depth, bool) and depth >= 1),
@@ -629,6 +709,8 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
             ("extension-commands", "cmake-packages", "import"),
             f"{where}: self",
         )
+        if "import" in slf:
+            _check_self_import(slf["import"], where)
         name = slf.get("name")
         if "name" in slf:
             _expect(
@@ -1331,10 +1413,17 @@ class Manifest:
         target = Path(branch.repo_abspath) / pathobj
         # Manifest data is never read through a symlink, whichever route
         # it comes by: git stores a symlink as a blob, so on the git
-        # side the link target text would be parsed as YAML, and the two
-        # routes must not disagree about the same repository.
-        if target.is_symlink():
-            raise _symlinked_import(branch.where, imp, target)
+        # side a linked file's target text would be parsed as YAML and
+        # a path through a linked directory would not resolve at all,
+        # and the two routes must not disagree about the same
+        # repository. Every component below the repository root is
+        # checked, as _check_paths_are_confined does for member paths;
+        # the root itself and anything above it is the user's placement.
+        current = Path(branch.repo_abspath)
+        for part in pathobj.parts:
+            current = current / part
+            if current.is_symlink():
+                raise _symlinked_import(branch.where, imp, current)
         if util.escapes_directory(target, branch.repo_abspath):
             raise MalformedManifest(f'{branch.where}: "self: import: {imp}": path escapes ' "the manifest repository")
         # An unreadable path raises OSError, not the "does it exist"
@@ -1706,7 +1795,10 @@ class Manifest:
         key = (member.name, norm)
         where = f"{path} (imported from member {member.name})"
         _check_import_cycle(key, where, branch)
-        content = self._member_import_content(member, path, shared)
+        # Read at the normalized path, as _import_member_self_path does:
+        # git does not normalize an inner ".." in a <rev>:<path> spec,
+        # and the failure would be reported as a stale repospace-rev.
+        content = self._member_import_content(member, norm, shared)
         if content is None:
             return
 
