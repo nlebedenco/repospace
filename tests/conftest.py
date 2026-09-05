@@ -148,7 +148,7 @@ class LibACommand(RepospaceCommand):
 """
 
 LIBA_EXT_YAML = """\
-command-extensions:
+extension-commands:
   - file: scripts/liba_ext.py
     commands:
       - name: liba-hello
@@ -181,7 +181,7 @@ class Topology:
                     f"      url: {self.url(self.libc_src)}\n"
                     "  self:\n"
                     "    cmake-packages: [LibA]\n"
-                    "    command-extensions: repospace-commands.yaml\n"
+                    "    extension-commands: repospace-commands.yaml\n"
                 ),
                 "repospace-commands.yaml": LIBA_EXT_YAML,
                 "scripts/liba_ext.py": LIBA_EXT_PY,

@@ -62,7 +62,7 @@ def test_members_json_content(repospace, run_repospace):
     liba = members[1]
     assert liba["declared-by"] == "manifest"
     assert liba["cmake-packages"] == ["LibA"]
-    assert liba["command-extensions"] == ["repospace-commands.yaml"]
+    assert liba["extension-commands"] == ["repospace-commands.yaml"]
     assert liba["sha"] == git_out(repospace.ws / "liba", "rev-parse", "refs/heads/repospace-rev")
     assert members[3]["declared-by"] == "liba"
     assert members[2]["revision"] == "v1.0"

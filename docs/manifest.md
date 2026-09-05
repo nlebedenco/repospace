@@ -83,7 +83,7 @@ Each entry accepts:
 | `path`               | string           | `name`              | Checkout path relative to the repospace top (POSIX separators; must stay inside the repospace; no `.git` components) |
 | `submodules`         | bool or list     | `false`             | `true` = update all recursively; or a list of `{path, name}`                                                         |
 | `clone-depth`        | positive int     | none                | Passed to `git fetch --depth`                                                                                        |
-| `command-extensions` | string or list   | none                | Extension command specification file(s), relative to the member root                                                 |
+| `extension-commands` | string or list   | none                | Extension command specification file(s), relative to the member root                                                 |
 | `cmake-packages`     | string or list   | none                | CMake package names whose `<name>_ROOT` should point at this member                                                  |
 | `import`             | see below        | none                | Import the member's own manifest(s)                                                                                  |
 | `groups`             | list             | `[]`                | Group membership (mutually exclusive with `import`)                                                                  |
@@ -107,7 +107,7 @@ placement is the user's own doing, not something manifest data can steer.
 
 ## self
 
-Attributes of the manifest repository itself: `name`, `command-extensions`,
+Attributes of the manifest repository itself: `name`, `extension-commands`,
 `cmake-packages`, `import`, and `userdata`.
 
 `name` is a *suggested clone-directory name*, used only by `repospace init` when
@@ -202,7 +202,7 @@ the highest. The `manifest.group-filter` configuration option and
 
 ## Extension commands
 
-`command-extensions` names one YAML specification file, or a list of them,
+`extension-commands` names one YAML specification file, or a list of them,
 relative to the member root (or to the manifest repository root under `self:`).
 Each file declares Python files inside the same repository and the command
 classes they provide; the Python files are imported only when a command is run
@@ -211,7 +211,7 @@ provide the same command name, the member earlier in resolution order wins.
 See [extensions.md](extensions.md) for the specification format and how to
 write a command.
 
-When a manifest imported from a member declares `command-extensions` (or
+When a manifest imported from a member declares `extension-commands` (or
 `cmake-packages`) under its own `self:` section, those values are attributed to
 that member.
 

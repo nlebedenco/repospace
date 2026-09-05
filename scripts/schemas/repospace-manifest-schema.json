@@ -59,7 +59,7 @@
               "type": "string",
               "pattern": "^[^./\\\\][^/\\\\]*$"
             },
-            "command-extensions": { "$ref": "#/$defs/stringOrStringList" },
+            "extension-commands": { "$ref": "#/$defs/stringOrStringList" },
             "cmake-packages": { "$ref": "#/$defs/cmakePackages" },
             "import": { "$ref": "#/$defs/selfImport" },
             "userdata": true
@@ -248,7 +248,7 @@
           "type": "integer",
           "minimum": 1
         },
-        "command-extensions": {
+        "extension-commands": {
           "description": "Extension command specification file(s), relative to the member root.",
           "$ref": "#/$defs/stringOrStringList"
         },

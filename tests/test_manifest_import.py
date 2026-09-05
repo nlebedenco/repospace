@@ -504,17 +504,17 @@ def test_member_attribution_of_extensions_and_packages():
           members:
             - name: child
               url: u
-              command-extensions: own.yaml
+              extension-commands: own.yaml
               import: true
         """,
         {
             ("child", "repospace.yaml"): (
-                "manifest:\n" "  self:\n" "    command-extensions: imported.yaml\n" "    cmake-packages: [ChildPkg]\n"
+                "manifest:\n" "  self:\n" "    extension-commands: imported.yaml\n" "    cmake-packages: [ChildPkg]\n"
             )
         },
     )
     child = manifest.members[1]
-    assert child.command_extensions == ["own.yaml", "imported.yaml"]
+    assert child.extension_commands == ["own.yaml", "imported.yaml"]
     assert child.cmake_packages == ["ChildPkg"]
 
 
@@ -565,19 +565,19 @@ def test_self_import_wins_over_top_level(tmp_path):
 def test_self_import_extension_precedence(tmp_path):
     top = tmp_path / "repospace.yaml"
     (tmp_path / "extra.yaml").write_text(
-        "manifest:\n" "  self:\n" "    command-extensions: imported.yaml\n" "    cmake-packages: [Imported]\n"
+        "manifest:\n" "  self:\n" "    extension-commands: imported.yaml\n" "    cmake-packages: [Imported]\n"
     )
     top.write_text(textwrap.dedent("""
             manifest:
               self:
                 import: extra.yaml
-                command-extensions: own.yaml
+                extension-commands: own.yaml
                 cmake-packages: [Own]
             """))
     manifest = Manifest.from_file(top)
     mm = manifest.members[0]
     # Self-imported values come first (higher precedence).
-    assert mm.command_extensions == ["imported.yaml", "own.yaml"]
+    assert mm.extension_commands == ["imported.yaml", "own.yaml"]
     assert mm.cmake_packages == ["Imported", "Own"]
 
 

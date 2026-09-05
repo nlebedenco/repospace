@@ -55,7 +55,7 @@ def _member_entry(member) -> dict:
         "sha": sha,
         "groups": list(member.groups),
         "cmake-packages": list(member.cmake_packages),
-        "command-extensions": list(member.command_extensions),
+        "extension-commands": list(member.extension_commands),
         "declared-by": member.declared_by,
     }
 

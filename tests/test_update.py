@@ -117,7 +117,7 @@ def test_attribution_after_update(repospace, run_repospace):
     liba = by_name["liba"]
     # From liba's own manifest "self:" section.
     assert liba.cmake_packages == ["LibA"]
-    assert liba.command_extensions == ["repospace-commands.yaml"]
+    assert liba.extension_commands == ["repospace-commands.yaml"]
     assert by_name["libc"].declared_by == "liba"
     assert by_name["manifest"].cmake_packages == ["App"]
 

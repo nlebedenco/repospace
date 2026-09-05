@@ -215,8 +215,8 @@ _MEMBER_HEAD = "manifest:\n  members:\n    - name: a\n      url: u\n"
         (_MEMBER_HEAD + "      clone-depth:\n", '"clone-depth" has no value'),
         (_MEMBER_HEAD + "      submodules:\n", '"submodules: false"'),
         (
-            _MEMBER_HEAD + "      command-extensions:\n",
-            '"command-extensions" has no value',
+            _MEMBER_HEAD + "      extension-commands:\n",
+            '"extension-commands" has no value',
         ),
         (
             _MEMBER_HEAD + "      cmake-packages:\n",
@@ -229,8 +229,8 @@ _MEMBER_HEAD = "manifest:\n  members:\n    - name: a\n      url: u\n"
             '"name-allowlist" has no value',
         ),
         (
-            "manifest:\n  self:\n    command-extensions:\n",
-            '"command-extensions" has no value',
+            "manifest:\n  self:\n    extension-commands:\n",
+            '"extension-commands" has no value',
         ),
         (
             "manifest:\n  self:\n    cmake-packages:\n",
@@ -390,18 +390,18 @@ def test_new_attributes():
           members:
             - name: a
               url: u
-              command-extensions: exts.yaml
+              extension-commands: exts.yaml
               cmake-packages: [Foo, Bar]
           self:
             name: app
-            command-extensions: [one.yaml, two.yaml]
+            extension-commands: [one.yaml, two.yaml]
             cmake-packages: App
         """)
     member = manifest.members[1]
-    assert member.command_extensions == ["exts.yaml"]
+    assert member.extension_commands == ["exts.yaml"]
     assert member.cmake_packages == ["Foo", "Bar"]
     mm = manifest.members[0]
-    assert mm.command_extensions == ["one.yaml", "two.yaml"]
+    assert mm.extension_commands == ["one.yaml", "two.yaml"]
     assert mm.cmake_packages == ["App"]
     assert manifest.yaml_name == "app"
 

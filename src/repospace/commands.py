@@ -3,14 +3,14 @@
 Extension authors subclass RepospaceCommand and describe their commands in a
 YAML specification file (conventionally ``repospace-commands.yaml``)::
 
-    command-extensions:
+    extension-commands:
       - file: scripts/my_extension.py
         commands:
           - name: my-command
             class: MyCommand      # optional, defaults to the name
             help: one-line help   # optional
 
-The path in the manifest's ``command-extensions`` attribute and the ``file:``
+The path in the manifest's ``extension-commands`` attribute and the ``file:``
 keys inside the specification are both relative to the member's root
 directory. Extension modules are imported lazily, only when the command is
 actually invoked, and the command class must be constructible with no
@@ -392,7 +392,7 @@ class RepospaceCommand(ABC):
 # ---------------------------------------------------------------------------
 # Extension command discovery and lazy loading
 
-_EXT_SCHEMA_ERROR = "invalid command-extensions specification"
+_EXT_SCHEMA_ERROR = "invalid extension-commands specification"
 
 _module_names = (f"repospace.commands.ext.cmd_{i}" for i in itertools.count(1))
 
@@ -521,7 +521,7 @@ def extension_commands(config, manifest) -> "Dict[str, List[ExtCommandSpec]]":
     if config is not None and not config.getboolean("commands.allow-extensions", default=True):
         return result
     for member in manifest.members:
-        if not member.command_extensions:
+        if not member.extension_commands:
             continue
         specs = _member_specs(member)
         if specs:
@@ -534,11 +534,11 @@ def _member_specs(member) -> List[ExtCommandSpec]:
     if root is None:
         return []
     specs: List[ExtCommandSpec] = []
-    for spec_rel in member.command_extensions:
+    for spec_rel in member.extension_commands:
         spec_file = os.path.join(root, spec_rel)
         if util.escapes_directory(spec_file, root):
             raise ExtensionCommandError(
-                hint=f"{member.name}: command-extensions path {spec_rel} " "escapes the member directory"
+                hint=f"{member.name}: extension-commands path {spec_rel} " "escapes the member directory"
             )
         if not os.path.isfile(spec_file):
             # The member may not be cloned yet; ignore silently.
@@ -559,10 +559,10 @@ def _specs_from_file(member, root: str, spec_file: str):
         raise ExtensionCommandError(hint=f"{spec_file}: not valid UTF-8: {err}")
     except yaml.YAMLError as err:
         raise ExtensionCommandError(hint=f"{spec_file}: cannot parse YAML: {err}")
-    if not isinstance(data, dict) or not isinstance(data.get("command-extensions"), list):
-        raise ExtensionCommandError(hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: expected a " '"command-extensions" list')
+    if not isinstance(data, dict) or not isinstance(data.get("extension-commands"), list):
+        raise ExtensionCommandError(hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: expected an " '"extension-commands" list')
     specs = []
-    for entry in data["command-extensions"]:
+    for entry in data["extension-commands"]:
         ok = isinstance(entry, dict) and isinstance(entry.get("file"), str) and isinstance(entry.get("commands"), list)
         if not ok:
             raise ExtensionCommandError(

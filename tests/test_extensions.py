@@ -86,7 +86,7 @@ def test_extension_collision_first_member_wins(updated, run_repospace):
                     print("libb command output")
             """))
     (libb / "repospace-commands.yaml").write_text(textwrap.dedent("""\
-            command-extensions:
+            extension-commands:
               - file: scripts/ext.py
                 commands:
                   - name: liba-hello
@@ -100,7 +100,7 @@ def test_extension_collision_first_member_wins(updated, run_repospace):
     yaml_file.write_text(
         yaml_file.read_text().replace(
             "      revision: v1.0\n",
-            "      revision: v1.0\n" "      command-extensions: repospace-commands.yaml\n",
+            "      revision: v1.0\n" "      extension-commands: repospace-commands.yaml\n",
         )
     )
     # liba comes first in resolution order, so it keeps liba-hello.
@@ -204,7 +204,7 @@ def test_extension_name_mismatch_with_spec(updated, run_repospace):
 
 def test_extension_non_string_help_does_not_crash_help(updated, run_repospace):
     (updated.ws / "liba" / "repospace-commands.yaml").write_text(
-        "command-extensions:\n"
+        "extension-commands:\n"
         "  - file: scripts/liba_ext.py\n"
         "    commands:\n"
         "      - name: liba-hello\n"
@@ -244,18 +244,18 @@ def test_extension_module_imported_once(updated, run_repospace):
     "content, hint",
     [
         ("{invalid yaml", "cannot parse YAML"),
-        ("- 1\n", 'expected a "command-extensions" list'),
-        ("command-extensions:\n  - 5\n", 'needs "file" and "commands"'),
+        ("- 1\n", 'expected an "extension-commands" list'),
+        ("extension-commands:\n  - 5\n", 'needs "file" and "commands"'),
         (
-            "command-extensions:\n" "  - file: scripts/liba_ext.py\n" "    commands:\n" "      - 5\n",
+            "extension-commands:\n" "  - file: scripts/liba_ext.py\n" "    commands:\n" "      - 5\n",
             'needs a non-empty string "name"',
         ),
         (
-            "command-extensions:\n" "  - file: scripts/liba_ext.py\n" "    commands:\n" "      - name: ''\n",
+            "extension-commands:\n" "  - file: scripts/liba_ext.py\n" "    commands:\n" "      - name: ''\n",
             'needs a non-empty string "name"',
         ),
         (
-            "command-extensions:\n"
+            "extension-commands:\n"
             "  - file: scripts/liba_ext.py\n"
             "    commands:\n"
             "      - name: liba-hello\n"
@@ -263,7 +263,7 @@ def test_extension_module_imported_once(updated, run_repospace):
             '"class" is not a non-empty string',
         ),
         (
-            "command-extensions:\n"
+            "extension-commands:\n"
             "  - file: scripts/liba_ext.py\n"
             "    commands:\n"
             "      - name: liba-hello\n"
@@ -285,7 +285,7 @@ def _declare_app_extensions(updated, spec_rel):
     yaml_file.write_text(
         yaml_file.read_text().replace(
             "    cmake-packages: [App]\n",
-            "    cmake-packages: [App]\n" f"    command-extensions: {spec_rel}\n",
+            "    cmake-packages: [App]\n" f"    extension-commands: {spec_rel}\n",
         )
     )
 
@@ -300,7 +300,7 @@ def test_extension_spec_path_escape_blocked(updated, run_repospace):
 def test_extension_py_file_escape_blocked(updated, run_repospace):
     _declare_app_extensions(updated, "app-commands.yaml")
     (updated.app / "app-commands.yaml").write_text(
-        "command-extensions:\n" "  - file: ../outside.py\n" "    commands:\n" "      - name: app-cmd\n"
+        "extension-commands:\n" "  - file: ../outside.py\n" "    commands:\n" "      - name: app-cmd\n"
     )
     code, out, err = run_repospace(["topdir"], cwd=updated.ws)
     assert code == 0
@@ -321,7 +321,7 @@ def test_extension_member_without_abspath_has_no_specs():
 
     from repospace.commands import _member_specs
 
-    member = SimpleNamespace(abspath=None, command_extensions=["x.yaml"], name="ghost")
+    member = SimpleNamespace(abspath=None, extension_commands=["x.yaml"], name="ghost")
     assert _member_specs(member) == []
 
 
@@ -360,7 +360,7 @@ def test_non_utf8_spec_file_warns_cleanly(updated, run_repospace):
     # One member's undecodable specification must not crash every
     # invocation, down to "repospace topdir".
     spec = updated.ws / "liba" / "repospace-commands.yaml"
-    spec.write_bytes(b"command-extensions:\n  - file: \xff\xfe.py\n")
+    spec.write_bytes(b"extension-commands:\n  - file: \xff\xfe.py\n")
     code, out, err = run_repospace(["topdir"], cwd=updated.ws)
     assert code == 0
     assert "cannot load extension commands" in err

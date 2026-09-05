@@ -171,7 +171,7 @@ class Member:
         *,
         submodules: Union[bool, List[Submodule]] = False,
         clone_depth: Optional[int] = None,
-        command_extensions: Optional[List[str]] = None,
+        extension_commands: Optional[List[str]] = None,
         cmake_packages: Optional[List[str]] = None,
         topdir: Optional[str] = None,
         groups: Optional[List[str]] = None,
@@ -185,7 +185,7 @@ class Member:
         self.path = path or name
         self.submodules = submodules
         self.clone_depth = clone_depth
-        self.command_extensions = _str_list(command_extensions)
+        self.extension_commands = _str_list(extension_commands)
         self.cmake_packages = _str_list(cmake_packages)
         self.topdir = topdir
         # Always "origin", however the URL was declared: manifest remote
@@ -281,8 +281,8 @@ class Member:
             data["path"] = self.path
         if self.clone_depth is not None:
             data["clone-depth"] = self.clone_depth
-        if self.command_extensions:
-            data["command-extensions"] = _shrink(self.command_extensions)
+        if self.extension_commands:
+            data["extension-commands"] = _shrink(self.extension_commands)
         if self.cmake_packages:
             data["cmake-packages"] = list(self.cmake_packages)
         if self.groups:
@@ -309,7 +309,7 @@ class ManifestMember(Member):
         path: Optional[str] = None,
         topdir: Optional[str] = None,
         *,
-        command_extensions: Optional[List[str]] = None,
+        extension_commands: Optional[List[str]] = None,
         cmake_packages: Optional[List[str]] = None,
         userdata: Any = None,
     ):
@@ -319,7 +319,7 @@ class ManifestMember(Member):
             revision=None,
             path=path,
             topdir=topdir,
-            command_extensions=command_extensions,
+            extension_commands=extension_commands,
             cmake_packages=cmake_packages,
             userdata=userdata,
         )
@@ -332,8 +332,8 @@ class ManifestMember(Member):
         # The manifest repository is the repospace root itself; there is
         # no location to record in manifest data.
         data: Dict[str, Any] = {}
-        if self.command_extensions:
-            data["command-extensions"] = _shrink(self.command_extensions)
+        if self.extension_commands:
+            data["extension-commands"] = _shrink(self.extension_commands)
         if self.cmake_packages:
             data["cmake-packages"] = list(self.cmake_packages)
         if self.userdata is not None:
@@ -359,14 +359,14 @@ _MEMBER_KEYS = frozenset(
         "path",
         "submodules",
         "clone-depth",
-        "command-extensions",
+        "extension-commands",
         "cmake-packages",
         "import",
         "groups",
         "userdata",
     }
 )
-_SELF_KEYS = frozenset({"name", "command-extensions", "cmake-packages", "import", "userdata"})
+_SELF_KEYS = frozenset({"name", "extension-commands", "cmake-packages", "import", "userdata"})
 _IMPORT_MAP_KEYS = frozenset(
     {
         "file",
@@ -590,7 +590,7 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
                 (
                     "clone-depth",
                     "submodules",
-                    "command-extensions",
+                    "extension-commands",
                     "cmake-packages",
                     "import",
                     "groups",
@@ -608,10 +608,10 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
             )
             if "revision" in md:
                 _check_revision(md["revision"], here)
-            ce = md.get("command-extensions")
+            ce = md.get("extension-commands")
             _expect(
                 ce is None or _is_str_or_str_list(ce),
-                f'{here}: "command-extensions" is not a string ' "or list of strings",
+                f'{here}: "extension-commands" is not a string ' "or list of strings",
             )
             _check_cmake_packages(md.get("cmake-packages"), here)
             groups = md.get("groups")
@@ -626,7 +626,7 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
         _check_keys(slf, _SELF_KEYS, f"{where}: self")
         _check_null_keys(
             slf,
-            ("command-extensions", "cmake-packages", "import"),
+            ("extension-commands", "cmake-packages", "import"),
             f"{where}: self",
         )
         name = slf.get("name")
@@ -646,10 +646,10 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
                 f'{where}: self: "name" must be a single plain path '
                 f'component that does not start with ".", not "{name}"',
             )
-        ce = slf.get("command-extensions")
+        ce = slf.get("extension-commands")
         _expect(
             ce is None or _is_str_or_str_list(ce),
-            f'{where}: self: "command-extensions" is not a string ' "or list of strings",
+            f'{where}: self: "extension-commands" is not a string ' "or list of strings",
         )
         _check_cmake_packages(slf.get("cmake-packages"), f"{where}: self")
 
@@ -790,7 +790,7 @@ class _Branch:
     repo_abspath: Optional[str]
     imap_filter: _FilterFn
     path_prefix: PurePosixPath
-    command_extensions_sink: List[str]
+    extension_commands_sink: List[str]
     cmake_packages_sink: List[str]
     depth: int
     where: str
@@ -1079,7 +1079,7 @@ class Manifest:
             repo_abspath=repo_abspath,
             imap_filter=None,
             path_prefix=PurePosixPath("."),
-            command_extensions_sink=[],
+            extension_commands_sink=[],
             cmake_packages_sink=[],
             depth=0,
             where=where,
@@ -1097,7 +1097,7 @@ class Manifest:
         manifest_member = ManifestMember(
             path="." if topdir else None,
             topdir=topdir,
-            command_extensions=top_branch.command_extensions_sink,
+            extension_commands=top_branch.extension_commands_sink,
             cmake_packages=top_branch.cmake_packages_sink,
             userdata=self.userdata,
         )
@@ -1283,9 +1283,9 @@ class Manifest:
         # Self-imported values were merged into the sinks above; the
         # current file's own values come after them, so self-imports
         # take precedence.
-        branch.command_extensions_sink[:] = _merge_unique(
-            branch.command_extensions_sink,
-            _str_list(slf.get("command-extensions")),
+        branch.extension_commands_sink[:] = _merge_unique(
+            branch.extension_commands_sink,
+            _str_list(slf.get("extension-commands")),
         )
         branch.cmake_packages_sink[:] = _merge_unique(branch.cmake_packages_sink, _str_list(slf.get("cmake-packages")))
 
@@ -1573,7 +1573,7 @@ class Manifest:
             path=path,
             submodules=self._load_submodules(md.get("submodules"), where),
             clone_depth=md.get("clone-depth"),
-            command_extensions=md.get("command-extensions"),
+            extension_commands=md.get("extension-commands"),
             cmake_packages=md.get("cmake-packages"),
             topdir=shared.topdir,
             groups=groups,
@@ -1727,7 +1727,7 @@ class Manifest:
                 # Extension commands and CMake packages declared under
                 # the imported manifest's "self:" logically belong to
                 # the member; collect them separately and attach below.
-                command_extensions_sink=[],
+                extension_commands_sink=[],
                 cmake_packages_sink=[],
                 depth=branch.depth + 1,
                 where=where,
@@ -1735,7 +1735,7 @@ class Manifest:
             )
             child_mdata = validate(document, where)
             self._load_file(child_mdata, shared, child)
-            member.command_extensions = _merge_unique(member.command_extensions, child.command_extensions_sink)
+            member.extension_commands = _merge_unique(member.extension_commands, child.extension_commands_sink)
             member.cmake_packages = _merge_unique(member.cmake_packages, child.cmake_packages_sink)
 
     def _member_import_content(self, member: Member, path: str, shared: _Shared) -> Optional[List[str]]:

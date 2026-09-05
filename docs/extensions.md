@@ -14,7 +14,7 @@ user's privileges. Only use manifests you trust, or disable extensions with
 
 ## Declaring extension commands
 
-A member opts in through the `command-extensions` manifest attribute (see
+A member opts in through the `extension-commands` manifest attribute (see
 [the manifest format](manifest.md)). Its value is one specification file, or a
 list of them, relative to the member root:
 
@@ -24,7 +24,7 @@ manifest:
     - name: tools
       url: https://example.com/tools
       path: external/tools
-      command-extensions: repospace-commands.yaml
+      extension-commands: repospace-commands.yaml
     - name: other
       url: https://example.com/other
       path: external/other
@@ -34,15 +34,15 @@ manifest:
 The attribute may also appear under `self:`, in which case the paths are
 relative to the manifest repository root and `repospace help` lists the commands
 under `member manifest (path: .)`. When a manifest imported from a member
-declares `command-extensions` under its own `self:` section, the commands are
+declares `extension-commands` under its own `self:` section, the commands are
 attributed to that member, so a repository can ship its own commands without the
 importing manifest naming them.
 
 The specification file, conventionally named `repospace-commands.yaml`, has one
-key, `command-extensions`, holding a list of entries:
+key, `extension-commands`, holding a list of entries:
 
 ```yaml
-command-extensions:
+extension-commands:
   - file: scripts/revisions.py
     commands:
       - name: revisions
@@ -180,7 +180,7 @@ class Revisions(RepospaceCommand):
             print(f"{member.name:20} {revision}")
 ```
 
-and the manifest entry with `command-extensions: repospace-commands.yaml`. After
+and the manifest entry with `extension-commands: repospace-commands.yaml`. After
 `repospace update` has cloned the members:
 
 ```console
@@ -232,7 +232,7 @@ and methods:
 
 Each `Member` exposes the manifest attributes (`name`, `path`, `url`,
 `revision`, `groups`, `userdata`, `description`, `submodules`, `clone_depth`,
-`cmake_packages`, `command_extensions`), `declared_by` (`manifest` when the
+`cmake_packages`, `extension_commands`), `declared_by` (`manifest` when the
 manifest repository's files declared it, otherwise the name of the member whose
 import did), plus:
 

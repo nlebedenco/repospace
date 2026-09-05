@@ -102,7 +102,7 @@ Run `repospace help <command>` for details. The global flags `-v`, `-q`, and
 name belongs to the command, so `diff`, `status`, and `grep` pass unknown
 arguments through to the underlying tool untouched.
 
-Members can provide additional commands through the `command-extensions`
+Members can provide additional commands through the `extension-commands`
 manifest attribute; `repospace help` lists the extensions available in a
 repospace, grouped by the member providing them. See
 [docs/extensions.md](docs/extensions.md) for how to write one.
@@ -147,7 +147,7 @@ when some members failed, so they always describe what is on disk:
 
 - `members.json` holds every resolved member as a flat array in resolution order
   (`name`, `path`, `abspath`, `url`, `revision`, `sha`, `groups`,
-  `cmake-packages`, `command-extensions`, `declared-by`), beside `topdir` and a
+  `cmake-packages`, `extension-commands`, `declared-by`), beside `topdir` and a
   format `version`, for consumption with `string(JSON)`. `sha` is the commit
   recorded in `repospace-rev` at the last update and `declared-by` the manifest
   that declared the member.
@@ -243,7 +243,7 @@ or depends on Zephyr.
 | Recursive imports     | `import` with `name-allowlist`, `name-blocklist`, `path-allowlist`, `path-blocklist`, `path-prefix`                   | same names                                                |
 | Group filters         | manifest `group-filter` plus the `manifest.group-filter` option                                                       | same                                                      |
 | Revision bookkeeping  | branch `manifest-rev`, detached `HEAD`                                                                                | branch `repospace-rev`, detached `HEAD`                   |
-| Extension commands    | `west-commands` attribute, `west-commands.yml`                                                                        | `command-extensions` attribute, `repospace-commands.yaml` |
+| Extension commands    | `west-commands` attribute, `west-commands.yml`                                                                        | `extension-commands` attribute, `repospace-commands.yaml` |
 | Configuration         | git-style INI at system, global and local levels                                                                      | same, with `REPOSPACE_CONFIG_*` overrides                 |
 | Built-in commands     | `init`, `update`, `list`, `manifest`, `compare`, `diff`, `status`, `forall`, `grep`, `config`, `topdir`, `help`       | same set                                                  |
 | Command options       | `--freeze`, `--resolve`, `--validate`, `--narrow`, `--rebase`, `--keep-descendants`, `--group-filter`, `--fetch`      | same names                                                |
