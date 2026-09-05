@@ -1,0 +1,83 @@
+# EditorConfig: https://editorconfig.org/
+
+# top-most EditorConfig file
+root = true
+
+# All (Defaults)
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 120
+indent_style = space
+indent_size = 4
+
+# reStructuredText
+[*.rst]
+indent_style = space
+indent_size = 3
+
+# YAML
+[{*.apinotes,*.yaml,*.yml,.clang-format,.clang-tidy,.clangd,.cmake-format,.conf-format,.kconfig-format}]
+indent_style = space
+indent_size = 2
+
+# HACK: The Zephyr IDE Extension keeps removing the final EOL that
+#       vscode adds when we open this file in the editor.
+[.vscode/zephyr-ide.json]
+insert_final_newline = false
+
+# JSON
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Windows Command Script
+[*.{bat,bat.in,cmd,cmd.in,ps1}]
+indent_style = space
+end_of_line = crlf
+
+# Valgrind Suppression File
+[*.supp]
+indent_size = 3
+
+# CMake
+[{CMakeLists.txt,*.cmake}]
+indent_style = space
+indent_size = 4
+
+[{Kconfig,Kconfig.*}]
+indent_style = space
+indent_size = 2
+max_line_length = 100
+
+# Makefile
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+# Git commit messages
+[COMMIT_EDITMSG]
+max_line_length = 75
+
+# Git modules manifest
+[.gitmodules]
+indent_style = tab
+indent_size = 4
+
+# Markdown
+[*.md]
+indent_style = space
+indent_size = 4
+max_line_length = 80
+
+# TOML
+[{*.ini,*.toml,.gitlint}]
+indent_style = space
+max_line_length = 100
+
+# License
+[LICENSE]
+indent_style = space
+max_line_length = 80
