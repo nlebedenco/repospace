@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nlebedenco/repospace/raw/main/scripts/schemas/repospace-manifest-schema.json",
+  "title": "repospace manifest",
+  "description": "Schema for repospace.yaml, the repospace manifest (YAML parsed to JSON). Checks are lexical: constraints that require path normalization, filesystem state, or cross-references (remote names, default remote presence) are enforced by the tool, not here.",
+  "type": "object",
+  "required": ["manifest"],
+  "additionalProperties": false,
+  "properties": {
+    "manifest": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "description": "Minimum schema version required to parse the file, as a string (quote it; unquoted 1.0 is a YAML number). The only supported schema version is 1.0.",
+          "anyOf": [
+            { "type": "string", "pattern": "^1(\\.0+)*$" },
+            { "type": "number", "enum": [1] }
+          ]
+        },
+        "defaults": {
+          "description": "Defaults for members in this file only; never inherited across imports.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "remote": {
+              "description": "Remote used by members that give neither remote nor url.",
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": { "$ref": "#/$defs/revision" }
+          }
+        },
+        "remotes": {
+          "description": "Named URL prefixes; a member using a remote gets url-base + \"/\" + (repo-path or name), with trailing slashes on url-base dropped. Remote names are manifest-internal identifiers: in a cloned member the git remote is always named \"origin\".",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "url-base"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "url-base": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "members": {
+          "description": "The repositories that make up the repospace.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/member" }
+        },
+        "self": {
+          "description": "Attributes of the manifest repository itself.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "description": "Suggested clone-directory name, used only by \"repospace init REPOSITORY\" without a DIRECTORY argument. A single plain path component that does not start with a dot.",
+              "type": "string",
+              "pattern": "^[^./\\\\][^/\\\\]*$"
+            },
+            "command-extensions": { "$ref": "#/$defs/stringOrStringList" },
+            "cmake-packages": { "$ref": "#/$defs/cmakePackages" },
+            "import": { "$ref": "#/$defs/selfImport" },
+            "userdata": true
+          }
+        },
+        "group-filter": {
+          "description": "Groups disabled (-group) or enabled (+group) by default.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[+-](?![+-])[^\\s,:]+$"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "stringOrStringList": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "pathPattern": {
+      "description": "Glob matched against a member path from the right (\"foo\" matches \"a/b/foo\"). It must name at least one path component: \"\" and \".\" match nothing.",
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "^\\.$" }
+    },
+    "pathPatterns": {
+      "anyOf": [
+        { "$ref": "#/$defs/pathPattern" },
+        { "type": "array", "items": { "$ref": "#/$defs/pathPattern" } }
+      ]
+    },
+    "cmakePackageName": {
+      "description": "CMake package name; letters, digits, and ._+- only (not starting with punctuation), because names are interpolated into generated CMake code.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+-]*$"
+    },
+    "cmakePackages": {
+      "anyOf": [
+        { "$ref": "#/$defs/cmakePackageName" },
+        { "type": "array", "items": { "$ref": "#/$defs/cmakePackageName" } }
+      ]
+    },
+    "revision": {
+      "description": "Branch, tag, or commit SHA, always a string: quote numeric-looking revisions, or YAML mangles them (1.10 becomes 1.1). A leading \"-\" is not allowed; git refnames cannot begin with one.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^-]"
+    },
+    "groupName": {
+      "description": "Group name, always a string: no leading + or -, no whitespace, commas, or colons. Quote numeric names, or YAML mangles them (1.10 becomes 1.1).",
+      "type": "string",
+      "pattern": "^(?![+-])[^\\s,:]+$"
+    },
+    "importMap": {
+      "description": "Import with filters. Names match exactly; path patterns match from the right. An allowlist match overrides a blocklist match; with no allowlist, everything not blocklisted is imported.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "description": "File, or directory of .yml/.yaml files, to import (default: repospace.yaml).",
+          "type": "string",
+          "minLength": 1
+        },
+        "name-allowlist": { "$ref": "#/$defs/stringOrStringList" },
+        "name-blocklist": { "$ref": "#/$defs/stringOrStringList" },
+        "path-allowlist": { "$ref": "#/$defs/pathPatterns" },
+        "path-blocklist": { "$ref": "#/$defs/pathPatterns" },
+        "path-prefix": {
+          "description": "Prepended to the imported members' paths. The importing member's own path is not affected.",
+          "type": "string"
+        }
+      }
+    },
+    "memberImport": {
+      "description": "Member import: true (the member's repospace.yaml), a path within the member, a filter mapping, or a sequence of those.",
+      "anyOf": [
+        { "type": "boolean" },
+        { "type": "string", "minLength": 1 },
+        { "$ref": "#/$defs/importMap" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/memberImportItem" }
+        }
+      ]
+    },
+    "memberImportItem": {
+      "description": "Inside a sequence, false is not allowed.",
+      "anyOf": [
+        { "const": true },
+        { "type": "string", "minLength": 1 },
+        { "$ref": "#/$defs/importMap" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/memberImportItem" }
+        }
+      ]
+    },
+    "selfImport": {
+      "description": "Self import: a path within the manifest repository, a filter mapping, or a sequence of those. Booleans are not allowed.",
+      "anyOf": [
+        { "type": "string", "minLength": 1 },
+        { "$ref": "#/$defs/importMap" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/selfImport" }
+        }
+      ]
+    },
+    "member": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "allOf": [
+        { "not": { "required": ["remote", "url"] } },
+        { "not": { "required": ["url", "repo-path"] } },
+        {
+          "if": {
+            "required": ["groups", "import"],
+            "properties": { "groups": { "minItems": 1 } }
+          },
+          "then": { "properties": { "import": { "const": false } } }
+        }
+      ],
+      "properties": {
+        "name": {
+          "description": "Unique identifier; \"manifest\" is reserved, path separators are not allowed.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!manifest$)[^/\\\\]+$"
+        },
+        "description": { "type": "string" },
+        "remote": {
+          "description": "Named remote for the fetch URL (mutually exclusive with url).",
+          "type": "string",
+          "minLength": 1
+        },
+        "repo-path": {
+          "description": "Suffix appended to the remote's url-base (default: name; mutually exclusive with url).",
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "description": "Complete fetch URL (mutually exclusive with remote and repo-path).",
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": { "$ref": "#/$defs/revision" },
+        "path": {
+          "description": "Checkout path relative to the repospace topdir (default: name). POSIX separators; must stay inside the repospace and outside .repospace/, with no .git component (in any case).",
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            { "not": { "pattern": "^/" } },
+            { "not": { "pattern": "^.:" } },
+            { "not": { "pattern": "\\\\" } },
+            { "not": { "pattern": "^\\.\\.(/|$)" } },
+            { "not": { "pattern": "^\\.repospace(/|$)" } },
+            { "not": { "pattern": "^\\./?$" } },
+            { "not": { "pattern": "(^|/)\\.[gG][iI][tT](/|$)" } }
+          ]
+        },
+        "submodules": {
+          "description": "true to update all submodules recursively, or a list restricting which ones.",
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path"],
+                "additionalProperties": false,
+                "properties": {
+                  "path": { "type": "string" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          ]
+        },
+        "clone-depth": {
+          "description": "Passed to git fetch --depth.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "command-extensions": {
+          "description": "Extension command specification file(s), relative to the member root.",
+          "$ref": "#/$defs/stringOrStringList"
+        },
+        "cmake-packages": {
+          "description": "CMake package names whose <name>_ROOT should point at this member.",
+          "$ref": "#/$defs/cmakePackages"
+        },
+        "import": {
+          "description": "Import the member's own manifest(s); mutually exclusive with groups.",
+          "$ref": "#/$defs/memberImport"
+        },
+        "groups": {
+          "description": "Group membership; mutually exclusive with import.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/groupName" }
+        },
+        "userdata": true
+      }
+    }
+  }
+}
