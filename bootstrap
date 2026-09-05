@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Script folder
+dp0=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+
+# Change into the script folder
+echo "-- Entering directory '$dp0'"
+pushd "$dp0" > /dev/null
+
+# Configure git message template
+git config commit.template .gitmessage
+git config commit.status false
+
+# Activate Python virtual environment (create if necessary)
+echo "-- Checking Python virtual environment..."
+[ -f .venv/bin/activate ] || python -m venv .venv --upgrade-deps
+source .venv/bin/activate
+
+pip install --upgrade pip
+pip install -e '.[dev]'
+
+# Install pre-commit hooks if necessary
+echo "-- Checking pre-commit hooks..."
+pre-commit install
+
+# Activate a nodejs virtual environment (create if necessary)
+echo "-- Checking Node virtual environment..."
+# HACK: Filter out a stray debug print() left inside nodeenv (nodeenv.py:1048, in _get_last_node_version()) that
+#       unconditionally prints a dict when resolving the latest node version:
+#
+#           print({"x86": is_x86_64_musl(), "risc": is_riscv64(), "lts": lts})
+#
+#       "x86", "risc", "lts" are fixed key names, not derived from the detected architecture. This is likely an
+#       overlooked debug print and might be fixed in a future nodeenv release.
+#
+#       nodeenv's own progress/status messages go through its logger, which writes to stderr (nodeenv.py:214), so
+#       grep never touches them -- this only ever filters the stray debug line from stdout.
+#
+#       grep's exit codes are: 0 = a line was selected, 1 = no lines were selected, 2 = an error occurred (e.g. bad
+#       pattern). 1 is never used for errors, so treating it as success cannot mask a real grep failure. Here,
+#       filtering the debug line normally leaves zero lines of output, i.e. exit 1, which is expected and not a
+#       failure -- the `|| [ $? -eq 1 ]` reinterprets that specific case as success. It must be `||`, not a
+#       sequential `;`, because this script has `set -e`: a plain failing statement inside the group would abort the
+#       group immediately (before any check could run), but a command that is not the last in an `||`/`&&` list is
+#       exempt from triggering errexit. pipefail (also set at the top of this script) still propagates a real
+#       nodeenv failure through this wrapper, since it uses the rightmost non-zero exit status among all pipeline
+#       stages.
+nodeenv -c -p -r scripts/nodeenv/requirements.txt | { grep -v "^{'x86':" || [ $? -eq 1 ]; }
+
+# Change back to the original working directory
+echo "-- Leaving directory '$dp0'"
+popd > /dev/null
