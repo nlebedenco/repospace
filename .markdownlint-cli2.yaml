@@ -1,0 +1,9 @@
+# markdownlint-cli2 configuration
+# https://github.com/DavidAnson/markdownlint-cli2#configuration
+#
+# Rule configuration lives in .markdownlint.yaml; this file only controls
+# which files markdownlint-cli2 scans.
+
+ignores:
+  - "external/**"
+  - ".!(claude)/**"

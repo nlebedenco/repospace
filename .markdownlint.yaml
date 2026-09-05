@@ -1,0 +1,46 @@
+# markdownlint configuration
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+#
+# Conventions derived from Markdown samples in external/zephyr (no
+# .markdownlint config exists upstream) and reconciled with .editorconfig,
+# which is authoritative for indent size and line length on *.md files.
+# Everything not listed below keeps the markdownlint default.
+
+default: true
+
+# Headings use ATX style ("#")
+MD003:
+  style: "atx"
+
+# Match .editorconfig indent_size
+MD007:
+  indent: 4
+
+# Match .editorconfig max_line_length
+MD013:
+  line_length: 80
+  # ASCII diagrams and command output in code fences are often not
+  # reasonably wrappable, same rationale as tables.
+  code_blocks: false
+  tables: false
+
+# Most fenced code blocks in the external/zephyr samples omit a language tag.
+MD040: false
+
+# For README.md files that are just short placeholder notes with no top-level
+# heading
+MD041: false
+
+# All sampled fenced code blocks use backticks; no tilde fences found.
+MD048:
+  style: "backtick"
+
+# Emphasis is overwhelmingly "*word*" in the samples; "_word_" is a rare
+# outlier.
+MD049:
+  style: "asterisk"
+
+# Strong emphasis is exclusively "**word**" in the samples; no "__word__"
+# found.
+MD050:
+  style: "asterisk"
