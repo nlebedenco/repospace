@@ -357,6 +357,16 @@ class Configuration:
                     raise MalformedConfig(f"configuration file is not valid UTF-8: " f"{path}: {err}")
                 except configparser.Error as err:
                     raise MalformedConfig(f"cannot parse configuration file: {err}")
+                except AttributeError:
+                    # configparser's own failure mode for an indented
+                    # (continuation) line under an option that has no
+                    # value: with allow_no_value the option holds None,
+                    # and the reader appends to it. A parse error like
+                    # the others, not a traceback out of every command.
+                    raise MalformedConfig(
+                        f"cannot parse configuration file: {path}: a "
+                        "continuation line follows an option without a value"
+                    )
                 # The DEFAULT section name is reserved, in any case:
                 # configparser copies its keys into every section on
                 # read, which is why set() refuses to write it. Reject
@@ -442,6 +452,11 @@ class Configuration:
                 f'cannot set "{option}": the section name ' f'"{configparser.DEFAULTSECT}" is reserved'
             )
         _check_value(option, str(value))
+        # Stored as configparser reads it back: surrounding whitespace
+        # on each line and trailing blank lines do not survive the
+        # file, so keeping them in memory would make get() answer
+        # differently in this process than in the next one.
+        value = "\n".join(line.strip() for line in str(value).split("\n")).rstrip()
         path = self._paths[configfile]
         if path is None:
             raise MalformedConfig(
@@ -451,10 +466,10 @@ class Configuration:
         try:
             if not parser.has_section(section):
                 parser.add_section(section)
-            parser.set(section, key, str(value))
+            parser.set(section, key, value)
         except ValueError as err:
             raise MalformedConfig(f'cannot set "{option}": {err}')
-        self._edit_file(configfile, section, key, str(value))
+        self._edit_file(configfile, section, key, value)
 
     def delete(self, option: str, configfile: Optional[ConfigFile] = None) -> None:
         """Delete *option*.

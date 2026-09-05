@@ -76,6 +76,16 @@ def test_malformed_file_raises(repospace):
         Configuration(topdir=str(repospace))
 
 
+def test_continuation_line_under_valueless_key_raises(repospace):
+    # configparser fails on this with an AttributeError of its own
+    # rather than a parsing error; it must still surface as
+    # MalformedConfig, not as a traceback out of every invocation.
+    write_ini(repospace / ".repospace" / "config", "[a]\nb\n  c\n")
+    with pytest.raises(MalformedConfig) as excinfo:
+        Configuration(topdir=str(repospace))
+    assert "continuation line" in str(excinfo.value)
+
+
 def test_unreadable_file_raises(repospace):
     # configparser.read() would silently skip a file it cannot open; a
     # configuration the user believes is in effect must not be dropped
@@ -433,6 +443,24 @@ def test_default_section_rejected_on_read(repospace):
         with pytest.raises(MalformedConfig) as excinfo:
             Configuration(topdir=str(repospace))
         assert "reserved" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "raw,stored",
+    [
+        ("  lead", "lead"),
+        ("trail  ", "trail"),
+        ("a  \n   b  \n\n", "a\nb"),
+        ("\nfirst line blank", "\nfirst line blank"),
+    ],
+)
+def test_set_stores_the_value_the_reader_gives_back(repospace, raw, stored):
+    # configparser strips each line and drops trailing blank lines on
+    # read; get() must answer the same in this process and the next.
+    config = Configuration(topdir=str(repospace))
+    config.set("alias.x", raw)
+    assert config.get("alias.x") == stored
+    assert Configuration(topdir=str(repospace)).get("alias.x") == stored
 
 
 def test_set_rejects_carriage_return_in_value(repospace):
