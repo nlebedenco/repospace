@@ -36,9 +36,9 @@ from repospace.app.inspection import List as ListCommand
 from repospace.app.inspection import ManifestCommand, Topdir
 from repospace.app.update import Update
 
-#: Commands allowed to run when the manifest cannot be loaded. "update" is
-#: included because running it is the way to fix a broken repospace-rev,
-#: and "manifest" because --validate/--path are how to debug the failure.
+#: Commands allowed to run when the manifest cannot be loaded. "update" is included because running
+#: it is the way to fix a broken repospace-rev, and "manifest" because --validate/--path are how to
+#: debug the failure.
 NO_MANIFEST_OK = frozenset({"help", "config", "topdir", "init", "update", "manifest"})
 
 
@@ -53,9 +53,8 @@ class EarlyArgs(NamedTuple):
 def parse_early_args(argv: List[str]) -> EarlyArgs:
     """Scan global options up to the command name, by hand.
 
-    This keeps everything after the command name untouched for the
-    command's own parser (extensions included), while still letting global
-    flags like -v adjust behavior before any parser exists.
+    This keeps everything after the command name untouched for the command's own parser (extensions
+    included), while still letting global flags like -v adjust behavior before any parser exists.
     """
     help_flag = False
     version = False
@@ -102,8 +101,8 @@ def _clamp_verbosity(value: int) -> Verbosity:
 class _LogHandler(logging.Handler):
     """Emit library log records with the CLI's warning/error format.
 
-    sys.stderr is looked up per record, not at construction, so
-    redirections (tests, callers embedding main) are honored.
+    sys.stderr is looked up per record, not at construction, so redirections (tests, callers
+    embedding main) are honored.
     """
 
     def emit(self, record):
@@ -116,10 +115,9 @@ class _LogHandler(logging.Handler):
 def _configure_logging(verbosity: Verbosity) -> None:
     """Route repospace library logging through the CLI conventions.
 
-    Warnings match wrn() output and are silenced by -qq like every
-    other warning; -v enables the libraries' debug messages. Without a
-    handler, logging's last-resort fallback would print bare messages
-    that ignore verbosity.
+    Warnings match wrn() output and are silenced by -qq like every other warning; -v enables the
+    libraries' debug messages. Without a handler, logging's last-resort fallback would print bare
+    messages that ignore verbosity.
     """
     logger = logging.getLogger("repospace")
     logger.handlers[:] = [_LogHandler()]
@@ -184,8 +182,8 @@ class RepospaceApp:
         self.manifest_error: Optional[Exception] = None
         self.builtins: Dict[str, RepospaceCommand] = {}
         self.builtin_groups = {}
-        # None means "could not be determined" (manifest unloadable),
-        # unlike {} which means there are genuinely none.
+        # None means "could not be determined" (manifest unloadable), unlike {} which means there
+        # are genuinely none.
         self.extensions: Optional[Dict[str, ExtCommandSpec]] = None
         self.extension_groups: Dict[str, List[ExtCommandSpec]] = {}
         self.aliases: Dict[str, List[str]] = {}
@@ -249,9 +247,8 @@ class RepospaceApp:
             self.extensions = None
             return
         except MalformedConfig as err:
-            # Like a broken alias: a bad commands.allow-extensions
-            # value must not take down every invocation (including the
-            # "config -d" that would remove it).
+            # Like a broken alias: a bad commands.allow-extensions value must not take down every
+            # invocation (including the "config -d" that would remove it).
             self.queued_warnings.append(f"cannot load extension commands: {err}")
             self.extensions = None
             return
@@ -284,9 +281,8 @@ class RepospaceApp:
             try:
                 self.aliases[key] = shlex.split(value or "")
             except ValueError as err:
-                # E.g. unbalanced quotes. A broken alias must not take
-                # down every invocation (including the "config -d" that
-                # would remove it).
+                # E.g. unbalanced quotes. A broken alias must not take down every invocation
+                # (including the "config -d" that would remove it).
                 self.queued_warnings.append(f'ignoring alias "{key}" ({err}): {value}')
 
     # -- parsers -----------------------------------------------------------
@@ -318,18 +314,16 @@ class RepospaceApp:
             default=0,
             help="print less output; may be given more than once",
         )
-        # Global flags (including -v/-q) are recognized before the
-        # command name only; everything after it belongs to the command
-        # itself, so a pass-through command can hand an untouched -v to
-        # its underlying tool.
+        # Global flags (including -v/-q) are recognized before the command name only; everything
+        # after it belongs to the command itself, so a pass-through command can hand an untouched -v
+        # to its underlying tool.
         subparser_gen = parser.add_subparsers(metavar="<command>", dest="command")
         return parser, subparser_gen
 
     # -- output ------------------------------------------------------------
 
     def _flush_warnings(self):
-        # Same threshold as RepospaceCommand.wrn: -qq and lower
-        # silence warnings.
+        # Same threshold as RepospaceCommand.wrn: -qq and lower silence warnings.
         verbosity = _clamp_verbosity(Verbosity.INF + self.verbosity_delta)
         if verbosity >= Verbosity.WRN:
             for warning in self.queued_warnings:
@@ -345,9 +339,8 @@ class RepospaceApp:
         def emit_command(name, help_text):
             lead = f"{indent}{name}:"
             if len(lead) < 22:
-                # wrap() yields no lines for empty help text (e.g. an
-                # alias set to the empty string); the entry must still
-                # be listed.
+                # wrap() yields no lines for empty help text (e.g. an alias set to the empty
+                # string); the entry must still be listed.
                 lines = textwrap.wrap(
                     help_text or "",
                     width=width,
@@ -386,7 +379,7 @@ class RepospaceApp:
         if self.extensions is None and self.topdir is not None:
             print("", file=file)
             print(
-                "Cannot load extension commands; help for them is not " "available.",
+                "Cannot load extension commands; help for them is not available.",
                 file=file,
             )
             print(
@@ -398,7 +391,7 @@ class RepospaceApp:
                 member = specs[0].member
                 print("", file=file)
                 print(
-                    f"extension commands from member {member.name} " f"(path: {path}):",
+                    f"extension commands from member {member.name} (path: {path}):",
                     file=file,
                 )
                 for spec in specs:
@@ -433,9 +426,8 @@ class RepospaceApp:
         # Before _setup(): manifest loading already logs.
         _configure_logging(_clamp_verbosity(Verbosity.INF + early.verbosity_delta))
         self._setup()
-        # Global flags from the original command line only; alias
-        # expansion below may add more, but the queued warnings (a
-        # broken alias among them) come out before expansion.
+        # Global flags from the original command line only; alias expansion below may add more, but
+        # the queued warnings (a broken alias among them) come out before expansion.
         self.verbosity_delta = early.verbosity_delta
         self._flush_warnings()
 
@@ -460,8 +452,8 @@ class RepospaceApp:
             early = parse_early_args(argv)
             command = early.command_name
 
-        # Alias expansion may have introduced global flags; the checks
-        # at the top of this method ran before expansion.
+        # Alias expansion may have introduced global flags; the checks at the top of this method ran
+        # before expansion.
         if early.version:
             print(f"repospace version {__version__}")
             return
@@ -505,7 +497,10 @@ class RepospaceApp:
                     '"repospace manifest --validate"'
                 )
             else:
-                hint = f"repospace {self.topdir} does not define this " 'extension command; try "repospace help"'
+                hint = (
+                    f"repospace {self.topdir} does not define this "
+                    'extension command; try "repospace help"'
+                )
         else:
             hint = "do you need to run this inside a repospace?"
         print(
@@ -515,14 +510,17 @@ class RepospaceApp:
         raise SystemExit(2)
 
     def _adjust_verbosity(self, command: RepospaceCommand):
-        # Global -v/-q flags apply before the command name only; after
-        # it, arguments belong to the command (or, for pass-through
-        # commands, to the underlying tool).
+        # Global -v/-q flags apply before the command name only; after it, arguments belong to the
+        # command (or, for pass-through commands, to the underlying tool).
         command.verbosity = _clamp_verbosity(command.verbosity + self.verbosity_delta)
 
     def _check_manifest_available(self, command: RepospaceCommand):
         if command.name not in NO_MANIFEST_OK and self.manifest is None and self.topdir is not None:
-            reason = str(self.manifest_error) if self.manifest_error is not None else "the manifest could not be loaded"
+            reason = (
+                str(self.manifest_error)
+                if self.manifest_error is not None
+                else "the manifest could not be loaded"
+            )
             print(
                 f"FATAL ERROR: can't run repospace {command.name}: {reason}",
                 file=sys.stderr,
@@ -533,12 +531,10 @@ class RepospaceApp:
     def _split_forwarded(command: RepospaceCommand, argv: List[str]):
         """Split argv at the first "--" for forward_dashdash commands.
 
-        Everything after the first "--" is forwarded untouched; argparse
-        would otherwise assign it to positionals (such as MEMBER). A
-        later "--" is forwarded too, so the underlying tool's own
-        separator stays reachable. parse_early_args rejects a "--"
-        before the command name, so the split never touches global
-        arguments.
+        Everything after the first "--" is forwarded untouched; argparse would otherwise assign it
+        to positionals (such as MEMBER). A later "--" is forwarded too, so the underlying tool's own
+        separator stays reachable. parse_early_args rejects a "--" before the command name, so the
+        split never touches global arguments.
         """
         if not command.forward_dashdash or "--" not in argv:
             return argv, []
@@ -552,10 +548,9 @@ class RepospaceApp:
                 command.add_parser(subparser_gen)
         command = self.builtins[name]
         argv, forwarded = self._split_forwarded(command, argv)
-        # Parsed before the manifest is required: argparse services
-        # "<command> -h" while parsing, and help must stay available in
-        # a repospace whose manifest is broken -- reading it is how the
-        # user finds the way out.
+        # Parsed before the manifest is required: argparse services "<command> -h" while parsing,
+        # and help must stay available in a repospace whose manifest is broken -- reading it is how
+        # the user finds the way out.
         args, unknown = parser.parse_known_args(argv)
         self._check_manifest_available(command)
         self._adjust_verbosity(command)
@@ -573,7 +568,7 @@ class RepospaceApp:
             command = spec.factory()
         except ExtensionCommandError as err:
             print(
-                f"FATAL ERROR: extension command {name} could not be " f"created: {err.hint}",
+                f"FATAL ERROR: extension command {name} could not be created: {err.hint}",
                 file=sys.stderr,
             )
             raise SystemExit(err.returncode)
@@ -605,10 +600,9 @@ def main(argv: Optional[List[str]] = None) -> None:
         print(f"FATAL ERROR: {err}", file=sys.stderr)
         raise SystemExit(1)
     except subprocess.CalledProcessError as err:
-        # A negative returncode means the child died on a signal; exit
-        # with the conventional 128 + signal instead, since a negative
-        # status would be truncated modulo 256 (-9 would become 247,
-        # not SIGKILL's 137).
+        # A negative returncode means the child died on a signal; exit with the conventional 128 +
+        # signal instead, since a negative status would be truncated modulo 256 (-9 would become
+        # 247, not SIGKILL's 137).
         if err.returncode < 0:
             detail = f"command died on signal {-err.returncode}"
         else:

@@ -62,9 +62,9 @@ def test_full_update(repospace, run_repospace):
 
 
 def test_refspec_in_revision_is_refused_before_any_fetch(repospace, run_repospace):
-    # A manifest revision is fetched as a refspec; "main:refs/heads/work"
-    # would force-update the member's local "work" branch to the
-    # remote's main. Validation refuses it before git is involved.
+    # A manifest revision is fetched as a refspec; "main:refs/heads/work" would force-update the
+    # member's local "work" branch to the remote's main. Validation refuses it before git is
+    # involved.
     repospace.rewrite_app_yaml(
         extra_members=(
             "    - name: lw\n"
@@ -79,8 +79,7 @@ def test_refspec_in_revision_is_refused_before_any_fetch(repospace, run_repospac
 
 
 def test_generate_write_failure_fails_cleanly(repospace, run_repospace):
-    # A repospace-file write failure must surface as a clean error,
-    # not a traceback.
+    # A repospace-file write failure must surface as a clean error, not a traceback.
     rdir = repospace.ws / ".repospace"
     rdir.chmod(0o500)
     try:
@@ -95,8 +94,8 @@ def test_generate_write_failure_fails_cleanly(repospace, run_repospace):
 
 
 def test_update_member_path_occupied_by_file(repospace, run_repospace):
-    # A plain file where a member should be cloned makes makedirs raise
-    # OSError; that must fail the member cleanly, not as a traceback.
+    # A plain file where a member should be cloned makes makedirs raise OSError; that must fail the
+    # member cleanly, not as a traceback.
     (repospace.ws / "libb").write_text("in the way\n")
     code, out, err = run_repospace(["update"], cwd=repospace.ws)
     assert code == 1
@@ -117,8 +116,8 @@ def test_named_update_member_path_occupied_by_file(repospace, run_repospace):
 
 
 def test_update_imported_member_path_occupied_by_file(repospace, run_repospace):
-    # liba's manifest data is needed during resolution itself, so the
-    # failure cannot be aggregated; it must still die cleanly.
+    # liba's manifest data is needed during resolution itself, so the failure cannot be aggregated;
+    # it must still die cleanly.
     (repospace.ws / "liba").write_text("in the way\n")
     code, out, err = run_repospace(["update"], cwd=repospace.ws)
     assert code == 1
@@ -141,9 +140,8 @@ def test_attribution_after_update(repospace, run_repospace):
 
 def test_update_sha_revision(repospace, run_repospace):
     update(run_repospace, repospace)
-    # A commit past v1.0, so the pinned SHA differs from the commit the
-    # first update already checked out; the final assertion can only
-    # hold if the second update actually moved HEAD to the SHA.
+    # A commit past v1.0, so the pinned SHA differs from the commit the first update already checked
+    # out; the final assertion can only hold if the second update actually moved HEAD to the SHA.
     sha = repospace.repos.commit(repospace.libb_src, {"beyond.txt": "b\n"}, "beyond v1.0")
     assert sha != git_out(repospace.ws / "libb", "rev-parse", "HEAD")
     repospace.rewrite_app_yaml()
@@ -154,11 +152,13 @@ def test_update_sha_revision(repospace, run_repospace):
 
 
 def test_update_all_hex_branch_name(repospace, run_repospace, repos):
-    # "beef" is misdetected as a SHA, widening the fetch; the revision
-    # must still resolve through the scratch ref.
+    # "beef" is misdetected as a SHA, widening the fetch; the revision must still resolve through
+    # the scratch ref.
     hex_src = repos.create("hex-src", {"hex.txt": "x\n"}, branch="beef")
     repospace.rewrite_app_yaml(
-        extra_members=("    - name: hexed\n" f"      url: {repospace.url(hex_src)}\n" "      revision: beef\n")
+        extra_members=(
+            "    - name: hexed\n" f"      url: {repospace.url(hex_src)}\n" "      revision: beef\n"
+        )
     )
     update(run_repospace, repospace)
     hexed = repospace.ws / "hexed"
@@ -184,8 +184,8 @@ def test_reupdate_follows_branch(repospace, run_repospace):
 
 def test_smart_fetch_skips_network_for_tag(repospace, run_repospace):
     update(run_repospace, repospace)
-    # With the remote gone, updating the tag-pinned member still works
-    # because the tag peels locally and no fetch happens.
+    # With the remote gone, updating the tag-pinned member still works because the tag peels locally
+    # and no fetch happens.
     shutil.rmtree(repospace.libb_src)
     update(run_repospace, repospace, "libb")
 
@@ -220,7 +220,9 @@ def test_rebase(repospace, run_repospace):
 def test_group_filter(repospace, run_repospace):
     repospace.rewrite_app_yaml(
         extra_members=(
-            "    - name: libd\n" f"      url: {repospace.url(repospace.libc_src)}\n" "      groups: [opt]\n"
+            "    - name: libd\n"
+            f"      url: {repospace.url(repospace.libc_src)}\n"
+            "      groups: [opt]\n"
         ),
         group_filter="-opt",
     )
@@ -284,8 +286,8 @@ def host_with_submodule(repos):
 def repoint_submodule(repos, host_src):
     """Repoint host-src's submodule at a second, equivalent remote.
 
-    Returns the new URL. It is a real clone of the original, so the
-    with-sync path can adopt it and still update the submodule.
+    Returns the new URL. It is a real clone of the original, so the with-sync path can adopt it and
+    still update the submodule.
     """
     alt = repos.bare_clone(repos.base / "sub-src", "sub-alt.git")
     url = f"file://{alt}"
@@ -306,13 +308,17 @@ def submodule_url(clone):
 def test_update_with_submodules(repospace, run_repospace, repos):
     host_src = host_with_submodule(repos)
     repospace.rewrite_app_yaml(
-        extra_members=("    - name: host\n" f"      url: {repospace.url(host_src)}\n" "      submodules: true\n")
+        extra_members=(
+            "    - name: host\n"
+            f"      url: {repospace.url(host_src)}\n"
+            "      submodules: true\n"
+        )
     )
     update(run_repospace, repospace)
     host = repospace.ws / "host"
     assert (host / "the-sub" / "sub.txt").is_file()
-    # A URL change in the host's .gitmodules reaches the clone's own
-    # configuration, which only "submodule sync" copies it into.
+    # A URL change in the host's .gitmodules reaches the clone's own configuration, which only
+    # "submodule sync" copies it into.
     new_url = repoint_submodule(repos, host_src)
     assert submodule_url(host) != new_url
     update(run_repospace, repospace)
@@ -336,15 +342,19 @@ def test_update_with_submodule_list(repospace, run_repospace, repos):
 def test_update_submodules_without_sync(repospace, run_repospace, repos):
     host_src = host_with_submodule(repos)
     repospace.rewrite_app_yaml(
-        extra_members=("    - name: host\n" f"      url: {repospace.url(host_src)}\n" "      submodules: true\n")
+        extra_members=(
+            "    - name: host\n"
+            f"      url: {repospace.url(host_src)}\n"
+            "      submodules: true\n"
+        )
     )
     run_repospace(["config", "update.sync-submodules", "false"], cwd=repospace.ws)
     update(run_repospace, repospace)
     host = repospace.ws / "host"
     assert (host / "the-sub" / "sub.txt").is_file()
     old_url = submodule_url(host)
-    # Without sync, a URL change in the host's .gitmodules must not
-    # reach the clone's own submodule configuration.
+    # Without sync, a URL change in the host's .gitmodules must not reach the clone's own submodule
+    # configuration.
     new_url = repoint_submodule(repos, host_src)
     assert new_url != old_url
     update(run_repospace, repospace)
@@ -424,10 +434,9 @@ def test_named_update_of_imported_member_after_full(repospace, run_repospace):
 
 
 def test_named_update_uses_winning_definition(repospace, run_repospace):
-    # A member import nested under a self-import registers its members
-    # before the top-level file's own, so its definition of a name wins
-    # (first definition wins). A named update must resolve that same
-    # winner, not the shadowed top-level definition.
+    # A member import nested under a self-import registers its members before the top-level file's
+    # own, so its definition of a name wins (first definition wins). A named update must resolve
+    # that same winner, not the shadowed top-level definition.
     app = repospace.app
     (app / "extra.yaml").write_text(
         "manifest:\n"
@@ -448,8 +457,8 @@ def test_named_update_uses_winning_definition(repospace, run_repospace):
     )
     update(run_repospace, repospace)
     new_sha = repospace.repos.commit(repospace.libc_src, {"more.txt": "m\n"}, "advance")
-    # liba's manifest declares libc at revision main; the shadowed
-    # top-level definition pins the old commit.
+    # liba's manifest declares libc at revision main; the shadowed top-level definition pins the old
+    # commit.
     update(run_repospace, repospace, "libc")
     assert git_out(repospace.ws / "libc", "rev-parse", "HEAD") == new_sha
 
@@ -468,9 +477,8 @@ def test_manifest_repository_not_updatable(repospace, run_repospace):
 
 
 def test_manifest_repository_rejected_before_updating(repospace, run_repospace):
-    # The rejection comes before any member moves: dying halfway
-    # through would leave the members named earlier updated but
-    # unrecorded, since the generated files are never written.
+    # The rejection comes before any member moves: dying halfway through would leave the members
+    # named earlier updated but unrecorded, since the generated files are never written.
     code, out, err = run_repospace(["update", "libb", "manifest"], cwd=repospace.ws)
     assert code == 1
     assert "manifest repository cannot be updated" in err
@@ -485,16 +493,18 @@ def test_named_update_malformed_manifest(repospace, run_repospace):
 
 
 def test_member_self_import_pinned_to_repospace_rev(repospace, run_repospace):
-    # liba's manifest self-imports extra.yaml. After update, editing
-    # extra.yaml on a local branch in the cloned member must not change
-    # what resolution sees: member data is read at repospace-rev.
+    # liba's manifest self-imports extra.yaml. After update, editing extra.yaml on a local branch in
+    # the cloned member must not change what resolution sees: member data is read at repospace-rev.
     liba = repospace.liba_src
     (liba / "repospace.yaml").write_text("manifest:\n  self:\n    import: extra.yaml\n")
     repospace.repos.commit(
         liba,
         {
             "extra.yaml": (
-                "manifest:\n" "  members:\n" "    - name: libc\n" f"      url: {repospace.url(repospace.libc_src)}\n"
+                "manifest:\n"
+                "  members:\n"
+                "    - name: libc\n"
+                f"      url: {repospace.url(repospace.libc_src)}\n"
             )
         },
         "self-import",
@@ -518,13 +528,16 @@ def test_member_self_import_pinned_to_repospace_rev(repospace, run_repospace):
 
 
 def test_member_directory_import_skips_subdirectories(repospace, run_repospace):
-    # A subdirectory whose name ends in .yaml inside an imported
-    # directory is not manifest data and must be ignored.
+    # A subdirectory whose name ends in .yaml inside an imported directory is not manifest data and
+    # must be ignored.
     repospace.repos.commit(
         repospace.liba_src,
         {
             "manifests/good.yaml": (
-                "manifest:\n" "  members:\n" "    - name: libc\n" f"      url: {repospace.url(repospace.libc_src)}\n"
+                "manifest:\n"
+                "  members:\n"
+                "    - name: libc\n"
+                f"      url: {repospace.url(repospace.libc_src)}\n"
             ),
             "manifests/sub.yaml/inner.txt": "not manifest data\n",
         },
@@ -558,9 +571,9 @@ def test_update_stats(repospace, run_repospace):
 
 
 def test_update_old_git_init(repospace, run_repospace, monkeypatch):
-    # git learned "init --initial-branch" in 2.28; the clone must be
-    # initialized without it below that version. The running git accepts
-    # both spellings, so the argv itself is what the test looks at.
+    # git learned "init --initial-branch" in 2.28; the clone must be initialized without it below
+    # that version. The running git accepts both spellings, so the argv itself is what the test
+    # looks at.
     import repospace.app.update as update_mod
     import repospace.manifest as manifest_mod
 
@@ -594,11 +607,13 @@ def test_smart_fetch_lightweight_tag(repospace, run_repospace, repos):
     lw_src = repos.create("lw-src", {"lw.txt": "x\n"})
     subprocess.run(["git", "-C", str(lw_src), "tag", "lw"], check=True)
     repospace.rewrite_app_yaml(
-        extra_members=("    - name: lw\n" f"      url: {repospace.url(lw_src)}\n" "      revision: lw\n")
+        extra_members=(
+            "    - name: lw\n" f"      url: {repospace.url(lw_src)}\n" "      revision: lw\n"
+        )
     )
     update(run_repospace, repospace)
-    # A lightweight tag is a commit object with a refs/tags symbolic
-    # name; it must still qualify for the smart fetch skip.
+    # A lightweight tag is a commit object with a refs/tags symbolic name; it must still qualify for
+    # the smart fetch skip.
     shutil.rmtree(lw_src)
     update(run_repospace, repospace, "lw")
 
@@ -614,8 +629,8 @@ def test_update_fetches_when_revision_is_local_branch(repospace, run_repospace):
 
 
 def test_narrow_update(repospace, run_repospace):
-    # A narrow fetch asks for the manifest revision alone: the remote's
-    # tags must not come along, as they do in a full update.
+    # A narrow fetch asks for the manifest revision alone: the remote's tags must not come along, as
+    # they do in a full update.
     repospace.repos.tag(repospace.liba_src, "v-narrow")
     update(run_repospace, repospace, "-n")
     for name in ("liba", "libb", "libc"):
@@ -631,7 +646,9 @@ def test_clone_depth(repospace, run_repospace, repos):
     deep_src = repos.create("deep-src", {"a.txt": "1\n"})
     repos.commit(deep_src, {"a.txt": "2\n"}, "second")
     repospace.rewrite_app_yaml(
-        extra_members=("    - name: deep\n" f"      url: {repospace.url(deep_src)}\n" "      clone-depth: 1\n")
+        extra_members=(
+            "    - name: deep\n" f"      url: {repospace.url(deep_src)}\n" "      clone-depth: 1\n"
+        )
     )
     update(run_repospace, repospace)
     deep = repospace.ws / "deep"
@@ -643,7 +660,11 @@ def test_update_sha_only_member(repospace, run_repospace, repos):
     sha_src = repos.create("sha-src", {"s.txt": "s\n"})
     sha = repos.head(sha_src)
     repospace.rewrite_app_yaml(
-        extra_members=("    - name: pinned\n" f"      url: {repospace.url(sha_src)}\n" f"      revision: {sha}\n")
+        extra_members=(
+            "    - name: pinned\n"
+            f"      url: {repospace.url(sha_src)}\n"
+            f"      revision: {sha}\n"
+        )
     )
     update(run_repospace, repospace)
     pinned = repospace.ws / "pinned"
@@ -654,7 +675,11 @@ def test_update_sha_only_member(repospace, run_repospace, repos):
 def test_update_unreachable_sha_fails(repospace, run_repospace, repos):
     lost_src = repos.create("lost-src", {"l.txt": "l\n"})
     repospace.rewrite_app_yaml(
-        extra_members=("    - name: lost\n" f"      url: {repospace.url(lost_src)}\n" f"      revision: {'d' * 40}\n")
+        extra_members=(
+            "    - name: lost\n"
+            f"      url: {repospace.url(lost_src)}\n"
+            f"      revision: {'d' * 40}\n"
+        )
     )
     code, out, err = run_repospace(["update", "lost"], cwd=repospace.ws)
     assert code == 1
@@ -678,9 +703,8 @@ def _checkout_manifest_rev(repo):
 
 
 def test_update_detaches_from_repospace_rev(repospace, run_repospace):
-    # repospace-rev is repospace's own branch. Left checked out,
-    # update-ref would move it underneath HEAD and the checkout that
-    # follows would find HEAD already at the new commit, leaving the
+    # repospace-rev is repospace's own branch. Left checked out, update-ref would move it underneath
+    # HEAD and the checkout that follows would find HEAD already at the new commit, leaving the
     # index and working tree at the old one (files shown as deleted).
     update(run_repospace, repospace)
     libc = repospace.ws / "libc"
@@ -696,8 +720,8 @@ def test_update_detaches_from_repospace_rev(repospace, run_repospace):
 
 @pytest.mark.parametrize("flag", ["-k", "-r"])
 def test_update_never_keeps_or_rebases_repospace_rev(repospace, run_repospace, flag):
-    # -k and -r are for the user's branches; repospace-rev is not one,
-    # and keeping or rebasing it would leave the working tree stale.
+    # -k and -r are for the user's branches; repospace-rev is not one, and keeping or rebasing it
+    # would leave the working tree stale.
     update(run_repospace, repospace)
     libc = repospace.ws / "libc"
     _checkout_manifest_rev(libc)
@@ -710,9 +734,8 @@ def test_update_never_keeps_or_rebases_repospace_rev(repospace, run_repospace, f
 
 
 def test_update_detaches_unborn_repospace_rev(repospace, run_repospace):
-    # An unborn HEAD on repospace-rev (git checkout --orphan) has no
-    # commit to detach at; HEAD is parked elsewhere so that creating
-    # the branch does not silently attach HEAD to it.
+    # An unborn HEAD on repospace-rev (git checkout --orphan) has no commit to detach at; HEAD is
+    # parked elsewhere so that creating the branch does not silently attach HEAD to it.
     update(run_repospace, repospace)
     libc = repospace.ws / "libc"
     subprocess.run(["git", "-C", str(libc), "branch", "-q", "-D", MANIFEST_REV], check=True)
@@ -730,14 +753,15 @@ def test_update_detaches_unborn_repospace_rev(repospace, run_repospace):
 
 
 def test_update_syncs_origin_url(repospace, run_repospace):
-    # The manifest says where a member comes from; "origin" (owned by
-    # repospace) follows a URL change, so plain git commands in the
-    # member do not keep talking to the old location.
+    # The manifest says where a member comes from; "origin" (owned by repospace) follows a URL
+    # change, so plain git commands in the member do not keep talking to the old location.
     update(run_repospace, repospace)
     libb = repospace.ws / "libb"
     moved = repospace.repos.bare_clone(repospace.libb_src, "libb-moved.git")
     yaml_file = repospace.app / "repospace.yaml"
-    yaml_file.write_text(yaml_file.read_text().replace(repospace.url(repospace.libb_src), repospace.url(moved)))
+    yaml_file.write_text(
+        yaml_file.read_text().replace(repospace.url(repospace.libb_src), repospace.url(moved))
+    )
     out, err = update(run_repospace, repospace, "libb")
     assert 'remote "origin" now points at' in out
     assert git_out(libb, "remote", "get-url", "origin") == repospace.url(moved)
@@ -752,15 +776,17 @@ def test_update_syncs_origin_url(repospace, run_repospace):
 
 
 def test_fetch_opt_beginning_with_dash(repospace, run_repospace):
-    # argparse cannot take "-o --prune" (the value looks like an
-    # option); the documented attached form reaches git fetch.
+    # argparse cannot take "-o --prune" (the value looks like an option); the documented attached
+    # form reaches git fetch.
     update(run_repospace, repospace, "--fetch-opt=--prune", "libb")
     assert (repospace.ws / "libb" / "libb.txt").is_file()
 
 
 def test_update_failure_of_imported_member(repospace, run_repospace):
     yaml_file = repospace.app / "repospace.yaml"
-    yaml_file.write_text(yaml_file.read_text().replace(f"file://{repospace.liba_src}", "file:///nowhere/at/all"))
+    yaml_file.write_text(
+        yaml_file.read_text().replace(f"file://{repospace.liba_src}", "file:///nowhere/at/all")
+    )
     code, out, err = run_repospace(["update"], cwd=repospace.ws)
     assert code == 1
     assert "cannot resolve the manifest" in err
@@ -768,7 +794,9 @@ def test_update_failure_of_imported_member(repospace, run_repospace):
 
 
 def test_update_failure_reports_member(repospace, run_repospace):
-    repospace.rewrite_app_yaml(extra_members=("    - name: ghost\n" "      url: file:///nowhere/at/all\n"))
+    repospace.rewrite_app_yaml(
+        extra_members=("    - name: ghost\n      url: file:///nowhere/at/all\n")
+    )
     code, out, err = run_repospace(["update"], cwd=repospace.ws)
     assert code == 1
     assert "update failed for" in err
@@ -789,8 +817,8 @@ def test_update_version_error_dies_cleanly(repospace, run_repospace):
 def test_member_manifest_content_missing_ref_vs_path(repos):
     repo = repos.create("content-src", {"repospace.yaml": "manifest:\n"})
     member = Member("content-src", url="unused", topdir=str(repos.base))
-    # No repospace-rev at all: not the same as a missing file, whatever
-    # wording the installed git uses.
+    # No repospace-rev at all: not the same as a missing file, whatever wording the installed git
+    # uses.
     with pytest.raises(subprocess.CalledProcessError):
         member_manifest_content(member, "repospace.yaml")
     repos.branch(repo, MANIFEST_REV)
@@ -800,14 +828,17 @@ def test_member_manifest_content_missing_ref_vs_path(repos):
 
 
 def test_member_import_failure_reasons(repos):
-    # Without an importer, the failure message names the actual cause
-    # (not cloned, no repospace-rev, file missing at repospace-rev)
-    # instead of a catch-all diagnosis blaming the clone.
+    # Without an importer, the failure message names the actual cause (not cloned, no repospace-rev,
+    # file missing at repospace-rev) instead of a catch-all diagnosis blaming the clone.
     repo = repos.create("reason-src", {"repospace.yaml": "manifest:\n"})
 
     def load(topdir=None, imp="true"):
         return Manifest.from_data(
-            "manifest:\n" "  members:\n" "    - name: reason-src\n" "      url: u\n" f"      import: {imp}\n",
+            "manifest:\n"
+            "  members:\n"
+            "    - name: reason-src\n"
+            "      url: u\n"
+            f"      import: {imp}\n",
             topdir=topdir,
         )
 
@@ -824,15 +855,15 @@ def test_member_import_failure_reasons(repos):
         load(topdir=str(repos.base), imp="missing.yaml")
     assert f"not found at {QUAL_MANIFEST_REV}" in str(excinfo.value)
 
-    # With the ref and the file both present, the import resolves.
-    # A Manifest is always truthy, so name the members it resolved to.
+    # With the ref and the file both present, the import resolves. A Manifest is always truthy, so
+    # name the members it resolved to.
     manifest = load(topdir=str(repos.base))
     assert [m.name for m in manifest.members] == ["manifest", "reason-src"]
 
 
 def test_member_manifest_content_ignores_bare_dotfile(repos):
-    # A file named just ".yml" has no suffix; the filesystem side of
-    # directory imports skips it, and the git side must match.
+    # A file named just ".yml" has no suffix; the filesystem side of directory imports skips it, and
+    # the git side must match.
     repo = repos.create(
         "dotfile-src",
         {
@@ -846,8 +877,8 @@ def test_member_manifest_content_ignores_bare_dotfile(repos):
 
 
 def test_symlink_escape_blocked(repospace, run_repospace, tmp_path):
-    # liba commits a symlink pointing outside the repospace and its
-    # imported manifest declares a member whose path traverses it.
+    # liba commits a symlink pointing outside the repospace and its imported manifest declares a
+    # member whose path traverses it.
     outside = tmp_path / "outside"
     outside.mkdir()
     liba = repospace.liba_src
@@ -867,10 +898,9 @@ def test_symlink_escape_blocked(repospace, run_repospace, tmp_path):
 
 
 def test_symlinked_member_directory_rejected(repospace, run_repospace, tmp_path):
-    # Symlinks are valid only above the topdir. A member directory
-    # symlinked elsewhere is not the user's escape hatch: nothing tells
-    # it apart from the same symlink committed by a member, so both are
-    # refused.
+    # Symlinks are valid only above the topdir. A member directory symlinked elsewhere is not the
+    # user's escape hatch: nothing tells it apart from the same symlink committed by a member, so
+    # both are refused.
     real = tmp_path / "elsewhere" / "libb"
     real.mkdir(parents=True)
     (repospace.ws / "libb").symlink_to(real)
@@ -888,9 +918,8 @@ def test_symlink_below_topdir_detection(tmp_path):
     top = tmp_path / "top"
     (top / "a").mkdir(parents=True)
     (top / "link").symlink_to(top / "a")
-    # Every symlink below the topdir is reported, whether or not a
-    # nested repository encloses it and wherever it points, including
-    # the member directory itself...
+    # Every symlink below the topdir is reported, whether or not a nested repository encloses it and
+    # wherever it points, including the member directory itself...
     assert _symlink_below_topdir(str(top), "link/m") == str(top / "link")
     assert _symlink_below_topdir(str(top), "link") == str(top / "link")
     # ...and a path of real directories is not.
@@ -899,8 +928,8 @@ def test_symlink_below_topdir_detection(tmp_path):
 
 
 def test_symlink_above_topdir_allowed(repospace, run_repospace, tmp_path):
-    # The policy stops at the topdir: a repospace reached through a
-    # symlinked parent is nobody's business but the user's.
+    # The policy stops at the topdir: a repospace reached through a symlinked parent is nobody's
+    # business but the user's.
     link = tmp_path / "link-to-repospace"
     link.symlink_to(repospace.ws)
     code, out, err = run_repospace(["update"], cwd=link)
@@ -932,16 +961,15 @@ def test_colocated_update(topology, run_repospace):
     manifest_entry = data["members"][0]
     assert manifest_entry["path"] == "."
     assert manifest_entry["abspath"] == str(app)
-    # Members show as untracked in the colocated manifest repo (hygiene
-    # is the user's .gitignore responsibility, documented).
+    # Members show as untracked in the colocated manifest repo (hygiene is the user's .gitignore
+    # responsibility, documented).
     status = git_out(app, "status", "--porcelain")
     assert "liba" in status
 
 
 def test_update_blocks_symlink_redirect(repospace, run_repospace, repos, tmp_path):
-    # A symlink committed inside a member must not redirect another
-    # member outside the repospace, even on the very first update when
-    # the symlink only comes into existence mid-update.
+    # A symlink committed inside a member must not redirect another member outside the repospace,
+    # even on the very first update when the symlink only comes into existence mid-update.
     outside = tmp_path / "outside"
     outside.mkdir()
     evil_src = repos.create("evil-src")
@@ -967,8 +995,8 @@ def test_update_blocks_symlink_redirect(repospace, run_repospace, repos, tmp_pat
 
 
 def test_update_rejects_toplevel_symlink(repospace, run_repospace, repos):
-    # A symlink the user creates at the top level is still below the
-    # topdir, so member paths may not traverse it either.
+    # A symlink the user creates at the top level is still below the topdir, so member paths may not
+    # traverse it either.
     real = repos.base / "elsewhere"
     real.mkdir()
     (repospace.ws / "external").symlink_to(real)
@@ -987,9 +1015,8 @@ def test_update_rejects_toplevel_symlink(repospace, run_repospace, repos):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: non-UTF-8 ref names")
 def test_update_non_utf8_branch_name(repospace, run_repospace):
-    # git ref names are byte strings that need not be valid UTF-8. One
-    # member checked out on such a branch must not take down its own
-    # update, nor the other members'.
+    # git ref names are byte strings that need not be valid UTF-8. One member checked out on such a
+    # branch must not take down its own update, nor the other members'.
     update(run_repospace, repospace)
     libb = repospace.ws / "libb"
     subprocess.run(
@@ -1004,14 +1031,14 @@ def test_update_non_utf8_branch_name(repospace, run_repospace):
         ],
         check=True,
     )
-    # -k asks git whether the branch descends from the manifest
-    # revision, so the name makes the round trip back to git intact.
+    # -k asks git whether the branch descends from the manifest revision, so the name makes the
+    # round trip back to git intact.
     out, err = update(run_repospace, repospace, "-k")
     assert "Traceback" not in err
     assert git_bytes(libb, "rev-parse", "--abbrev-ref", "HEAD") == b"br-\xff"
     assert (repospace.ws / "libc" / "libc.txt").is_file()
-    # Without -k the member is detached and the name only printed, with
-    # the undecodable byte escaped.
+    # Without -k the member is detached and the name only printed, with the undecodable byte
+    # escaped.
     out, err = update(run_repospace, repospace)
     assert git_bytes(libb, "rev-parse", "--abbrev-ref", "HEAD") == b"HEAD"
     assert r'left branch "br-\xff"' in out
@@ -1019,10 +1046,9 @@ def test_update_non_utf8_branch_name(repospace, run_repospace):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: non-UTF-8 ref names")
 def test_update_non_utf8_remote_branch_name(repospace, run_repospace, repos):
-    # A SHA revision fetches every remote branch tip into the scratch
-    # namespace, so the remote decides those ref names; cleaning them up
-    # must survive one that is not valid UTF-8, and must name it back to
-    # git byte for byte or the ref would survive.
+    # A SHA revision fetches every remote branch tip into the scratch namespace, so the remote
+    # decides those ref names; cleaning them up must survive one that is not valid UTF-8, and must
+    # name it back to git byte for byte or the ref would survive.
     odd_src = repos.create("odd-src", {"odd.txt": "o\n"})
     subprocess.run(
         [b"git", b"-C", os.fsencode(str(odd_src)), b"branch", b"br-\xff"],
@@ -1030,7 +1056,9 @@ def test_update_non_utf8_remote_branch_name(repospace, run_repospace, repos):
     )
     repospace.rewrite_app_yaml(
         extra_members=(
-            "    - name: odd\n" f"      url: {repospace.url(odd_src)}\n" f"      revision: {repos.head(odd_src)}\n"
+            "    - name: odd\n"
+            f"      url: {repospace.url(odd_src)}\n"
+            f"      revision: {repos.head(odd_src)}\n"
         )
     )
     out, err = update(run_repospace, repospace)
@@ -1041,9 +1069,8 @@ def test_update_non_utf8_remote_branch_name(repospace, run_repospace, repos):
 
 
 def test_update_with_ref_named_head(repospace, run_repospace):
-    # A tag named HEAD makes "rev-parse --abbrev-ref HEAD" succeed with
-    # empty output. The member is detached, so there is no branch left
-    # behind and no switch-back hint to give.
+    # A tag named HEAD makes "rev-parse --abbrev-ref HEAD" succeed with empty output. The member is
+    # detached, so there is no branch left behind and no switch-back hint to give.
     update(run_repospace, repospace)
     libb = repospace.ws / "libb"
     subprocess.run(["git", "-C", str(libb), "tag", "HEAD"], check=True)

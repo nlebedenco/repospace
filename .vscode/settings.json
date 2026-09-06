@@ -4,11 +4,6 @@
       75
     ]
   },
-  "[ini]": {
-    "editor.rulers": [
-      100
-    ]
-  },
   "[markdown]": {
     "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
     "editor.rulers": [
@@ -17,11 +12,6 @@
   },
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter"
-  },
-  "[toml]": {
-    "editor.rulers": [
-      100
-    ]
   },
   "[yaml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml"
@@ -114,21 +104,20 @@
   "debug.showInStatusBar": "never",
   "debug.toolBarLocation": "docked",
   "editor.rulers": [
-    120
+    100
   ],
   "files.associations": {
     ".gitlint": "toml",
     ".gitmessage": "plaintext",
-    // Claude Code extension takes ownership of files it recognizes as skill
-    // definitions and sets those files' language mode to "skill" instead of
-    // "markdown" creating a problem for formatter/linters. Force markdown
-    // explicitly so [markdown]'s editor.defaultFormatter/editor.rulers apply.
+    // Claude Code extension takes ownership of files it recognizes as skill definitions and sets
+    // those files' language mode to "skill" instead of "markdown" creating a problem for
+    // formatter/linters. Force markdown explicitly so [markdown]'s
+    // editor.defaultFormatter/editor.rulers apply.
     "**/SKILL.md": "markdown"
   },
-  // Core VSCode file watcher/search excludes. Mirrors the exclude lists already
-  // used by python.analysis.exclude, cSpell.ignorePaths and better-todo-tree
-  // below, which scope their own tools but not the engine's file watcher or
-  // search/quick-open indexer.
+  // Core VSCode file watcher/search excludes. Mirrors the exclude lists already used by
+  // python.analysis.exclude, cSpell.ignorePaths and better-todo-tree below, which scope their own
+  // tools but not the engine's file watcher or search/quick-open indexer.
   "files.watcherExclude": {
     "**/.build*": true,
     "**/.lock*": true,
@@ -148,7 +137,8 @@
     "**/__pycache__"
   ],
   "python.terminal.activateEnvInCurrentTerminal": false,
-  "python.terminal.activateEnvironment": false, // superseded by python-envs.terminal.autoActivationType in user settings.json
+  // Superseded by python-envs.terminal.autoActivationType in user settings.json.
+  "python.terminal.activateEnvironment": false,
   "python.terminal.shellIntegration.enabled": false,
   "python.testing.pytestArgs": [
     "tests"
@@ -197,7 +187,7 @@
   "terminal.integrated.enablePersistentSessions": false,
   "terminal.integrated.persistentSessionReviveProcess": "never",
   "yaml.extension.recommendations": false,
-  "yaml.format.printWidth": 120,
+  "yaml.format.printWidth": 100,
   "yaml.schemas": {
     "scripts/schemas/repospace-manifest-schema.json": [
       "repospace.yaml"

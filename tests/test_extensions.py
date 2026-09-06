@@ -44,7 +44,7 @@ def test_help_for_extension(updated, run_repospace):
 
 def test_builtin_name_collision_ignored(updated, run_repospace):
     spec = updated.ws / "liba" / "repospace-commands.yaml"
-    spec.write_text(spec.read_text() + "      - name: update\n" "        class: LibACommand\n")
+    spec.write_text(spec.read_text() + "      - name: update\n        class: LibACommand\n")
     code, out, err = run_repospace(["liba-hello"], cwd=updated.ws)
     assert code == 0, err
     assert 'ignoring member liba extension command "update"' in err
@@ -100,7 +100,7 @@ def test_extension_collision_first_member_wins(updated, run_repospace):
     yaml_file.write_text(
         yaml_file.read_text().replace(
             "      revision: v1.0\n",
-            "      revision: v1.0\n" "      extension-commands: repospace-commands.yaml\n",
+            "      revision: v1.0\n      extension-commands: repospace-commands.yaml\n",
         )
     )
     # liba comes first in resolution order, so it keeps liba-hello.
@@ -122,9 +122,8 @@ def test_allow_extensions_config(updated, run_repospace):
 
 
 def test_invalid_allow_extensions_value_warns_and_continues(updated, run_repospace):
-    # Like a malformed alias: a value getboolean rejects must not take
-    # down every invocation, or the "config -d" that removes it could
-    # never run.
+    # Like a malformed alias: a value getboolean rejects must not take down every invocation, or the
+    # "config -d" that removes it could never run.
     run_repospace(["config", "commands.allow-extensions", "nonsense"], cwd=updated.ws)
     code, out, err = run_repospace(["list"], cwd=updated.ws)
     assert code == 0, err
@@ -137,7 +136,9 @@ def test_invalid_allow_extensions_value_warns_and_continues(updated, run_repospa
 
 
 def test_lazy_loading_survives_broken_module(updated, run_repospace):
-    (updated.ws / "liba" / "scripts" / "liba_ext.py").write_text("raise RuntimeError('boom at import time')\n")
+    (updated.ws / "liba" / "scripts" / "liba_ext.py").write_text(
+        "raise RuntimeError('boom at import time')\n"
+    )
     # Discovery does not import the module: help still lists the command.
     code, out, err = run_repospace(["help"], cwd=updated.ws)
     assert code == 0
@@ -150,8 +151,8 @@ def test_lazy_loading_survives_broken_module(updated, run_repospace):
 
 
 def test_extensions_unavailable_before_update(repospace, run_repospace):
-    # liba is not cloned yet, so the manifest (which imports from liba)
-    # cannot resolve and extensions are unavailable.
+    # liba is not cloned yet, so the manifest (which imports from liba) cannot resolve and
+    # extensions are unavailable.
     code, out, err = run_repospace(["liba-hello"], cwd=repospace.ws)
     assert code == 2
     assert "manifest could not be loaded" in err
@@ -189,9 +190,8 @@ def test_extension_class_not_a_command(updated, run_repospace):
 
 
 def test_extension_name_mismatch_with_spec(updated, run_repospace):
-    # A class registering a name other than the specification's would
-    # only fail later with a bare argparse "invalid choice" error;
-    # the mismatch must be diagnosed instead.
+    # A class registering a name other than the specification's would only fail later with a bare
+    # argparse "invalid choice" error; the mismatch must be diagnosed instead.
     spec = updated.ws / "liba" / "repospace-commands.yaml"
     spec.write_text(spec.read_text().replace("name: liba-hello", "name: other-name"))
     code, out, err = run_repospace(["other-name"], cwd=updated.ws)
@@ -225,8 +225,8 @@ def test_extension_non_python_file(updated, run_repospace):
 
 
 def test_extension_module_imported_once(updated, run_repospace):
-    # The module import cache must keep side effects from repeating when
-    # the same extension file is loaded again in this process.
+    # The module import cache must keep side effects from repeating when the same extension file is
+    # loaded again in this process.
     counter = updated.ws / "liba" / "scripts" / "import-count.txt"
     ext = updated.ws / "liba" / "scripts" / "liba_ext.py"
     ext.write_text(
@@ -247,11 +247,17 @@ def test_extension_module_imported_once(updated, run_repospace):
         ("- 1\n", 'expected an "extension-commands" list'),
         ("extension-commands:\n  - 5\n", 'needs "file" and "commands"'),
         (
-            "extension-commands:\n" "  - file: scripts/liba_ext.py\n" "    commands:\n" "      - 5\n",
+            "extension-commands:\n"
+            "  - file: scripts/liba_ext.py\n"
+            "    commands:\n"
+            "      - 5\n",
             'needs a non-empty string "name"',
         ),
         (
-            "extension-commands:\n" "  - file: scripts/liba_ext.py\n" "    commands:\n" "      - name: ''\n",
+            "extension-commands:\n"
+            "  - file: scripts/liba_ext.py\n"
+            "    commands:\n"
+            "      - name: ''\n",
             'needs a non-empty string "name"',
         ),
         (
@@ -300,7 +306,10 @@ def test_extension_spec_path_escape_blocked(updated, run_repospace):
 def test_extension_py_file_escape_blocked(updated, run_repospace):
     _declare_app_extensions(updated, "app-commands.yaml")
     (updated.app / "app-commands.yaml").write_text(
-        "extension-commands:\n" "  - file: ../outside.py\n" "    commands:\n" "      - name: app-cmd\n"
+        "extension-commands:\n"
+        "  - file: ../outside.py\n"
+        "    commands:\n"
+        "      - name: app-cmd\n"
     )
     code, out, err = run_repospace(["topdir"], cwd=updated.ws)
     assert code == 0
@@ -308,8 +317,7 @@ def test_extension_py_file_escape_blocked(updated, run_repospace):
 
 
 def test_extension_missing_spec_ignored(updated, run_repospace):
-    # The member may not be cloned yet; a missing spec file is not an
-    # error.
+    # The member may not be cloned yet; a missing spec file is not an error.
     _declare_app_extensions(updated, "nonexistent.yaml")
     code, out, err = run_repospace(["topdir"], cwd=updated.ws)
     assert code == 0, err
@@ -326,8 +334,8 @@ def test_extension_member_without_abspath_has_no_specs():
 
 
 def test_extension_exiting_at_import_fails_cleanly(updated, run_repospace):
-    # sys.exit() at import time must not end repospace with the
-    # extension's own code and nothing said about why.
+    # sys.exit() at import time must not end repospace with the extension's own code and nothing
+    # said about why.
     (updated.ws / "liba" / "scripts" / "liba_ext.py").write_text("import sys\n\nsys.exit(42)\n")
     code, out, err = run_repospace(["liba-hello"], cwd=updated.ws)
     assert code == 1
@@ -337,11 +345,13 @@ def test_extension_exiting_at_import_fails_cleanly(updated, run_repospace):
 
 
 def test_failed_extension_import_leaves_sys_path_unchanged(updated, run_repospace, monkeypatch):
-    # A directory appended for an import that then failed would stay on
-    # the path for the rest of the process.
+    # A directory appended for an import that then failed would stay on the path for the rest of the
+    # process.
     monkeypatch.setattr(sys, "path", list(sys.path))
     before = list(sys.path)
-    (updated.ws / "liba" / "scripts" / "liba_ext.py").write_text("raise RuntimeError('boom at import time')\n")
+    (updated.ws / "liba" / "scripts" / "liba_ext.py").write_text(
+        "raise RuntimeError('boom at import time')\n"
+    )
     code, out, err = run_repospace(["liba-hello"], cwd=updated.ws)
     assert code == 1
     assert sys.path == before
@@ -357,8 +367,8 @@ def test_extension_directory_joins_sys_path_once(updated, run_repospace, monkeyp
 
 
 def test_non_utf8_spec_file_warns_cleanly(updated, run_repospace):
-    # One member's undecodable specification must not crash every
-    # invocation, down to "repospace topdir".
+    # One member's undecodable specification must not crash every invocation, down to "repospace
+    # topdir".
     spec = updated.ws / "liba" / "repospace-commands.yaml"
     spec.write_bytes(b"extension-commands:\n  - file: \xff\xfe.py\n")
     code, out, err = run_repospace(["topdir"], cwd=updated.ws)

@@ -16,16 +16,15 @@ def isolate_env(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    # pathlib.Path.home() ignores HOME on Windows: ntpath.expanduser
-    # consults USERPROFILE, then HOMEDRIVE+HOMEPATH. Without these the
-    # global-config tests would read and write the real profile.
+    # pathlib.Path.home() ignores HOME on Windows: ntpath.expanduser consults USERPROFILE, then
+    # HOMEDRIVE+HOMEPATH. Without these the global-config tests would read and write the real
+    # profile.
     monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.delenv("HOMEDRIVE", raising=False)
     monkeypatch.delenv("HOMEPATH", raising=False)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(home / ".config"))
-    # Redirected, not deleted: deleting it lets the system scope fall
-    # back to the host's real /etc/repospace-config, whose contents
-    # would then leak into every test.
+    # Redirected, not deleted: deleting it lets the system scope fall back to the host's real
+    # /etc/repospace-config, whose contents would then leak into every test.
     monkeypatch.setenv("REPOSPACE_CONFIG_SYSTEM", str(tmp_path / "no-system-config"))
     for var in (
         "REPOSPACE_CONFIG_GLOBAL",
@@ -52,11 +51,10 @@ def isolate_env(tmp_path, monkeypatch):
 def isolate_process_state():
     """Undo the process-global state extension loading leaves behind.
 
-    Loading an extension command appends its directory to sys.path and
-    caches the imported module by resolved path. Both outlive the test
-    that caused them: sys.path grows with entries pointing at deleted
-    temporary directories, and a later test reusing a path could be
-    served a module imported from a previous test's file.
+    Loading an extension command appends its directory to sys.path and caches the imported module by
+    resolved path. Both outlive the test that caused them: sys.path grows with entries pointing at
+    deleted temporary directories, and a later test reusing a path could be served a module imported
+    from a previous test's file.
     """
     from repospace import commands
 
@@ -65,8 +63,8 @@ def isolate_process_state():
     try:
         yield
     finally:
-        # In place, so a test that swapped sys.path for a copy of its
-        # own (and whose monkeypatch undo runs after this) is unharmed.
+        # In place, so a test that swapped sys.path for a copy of its own (and whose monkeypatch
+        # undo runs after this) is unharmed.
         sys.path[:] = saved_path
         commands._EXT_MODULES_CACHE.clear()
 
@@ -197,14 +195,19 @@ class Topology:
         return f"file://{path}"
 
     def app_yaml(self, extra_members="", group_filter=""):
+        group_filter_line = f"  group-filter: [{group_filter}]\n" if group_filter else ""
         return (
-            "manifest:\n" + (f"  group-filter: [{group_filter}]\n" if group_filter else "") + "  members:\n"
+            "manifest:\n"
+            f"{group_filter_line}"
+            "  members:\n"
             "    - name: liba\n"
             f"      url: {self.url(self.liba_src)}\n"
             "      import: true\n"
             "    - name: libb\n"
             f"      url: {self.url(self.libb_src)}\n"
-            "      revision: v1.0\n" + extra_members + "  self:\n"
+            "      revision: v1.0\n"
+            f"{extra_members}"
+            "  self:\n"
             "    name: app\n"
             "    cmake-packages: [App]\n"
         )
@@ -222,9 +225,8 @@ def topology(repos, tmp_path):
 def repospace(topology, run_repospace):
     """An initialized (not yet updated) repospace for the topology.
 
-    Colocated: the app manifest repo is the repospace root; members
-    clone into it. topology.ws is repointed at it so tests address
-    members as <ws>/<member>.
+    Colocated: the app manifest repo is the repospace root; members clone into it. topology.ws is
+    repointed at it so tests address members as <ws>/<member>.
     """
     code, out, err = run_repospace(["init"], cwd=topology.app)
     assert code == 0, err
@@ -236,8 +238,8 @@ def repospace(topology, run_repospace):
 def run_repospace(capfd):
     """Invoke the repospace CLI in-process; return (exit_code, out, err).
 
-    Captures at the file-descriptor level so output written by child
-    processes (git, forall shell commands) is captured too.
+    Captures at the file-descriptor level so output written by child processes (git, forall shell
+    commands) is captured too.
     """
 
     def run(args, cwd=None):

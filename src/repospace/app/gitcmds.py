@@ -19,14 +19,11 @@ class Diff(MemberCommand):
         super().__init__(
             "diff",
             "run git diff on members",
-            "Run git diff on each cloned member; extra arguments are "
-            "passed through to git diff. Everything after the first -- "
-            "goes to git diff untouched; use it for git diff's own "
-            "revisions and paths, which are otherwise read as member "
-            "names, and for options that collide with this command's "
-            "(e.g. -a). "
-            '"repospace -qq diff" relays --quiet to git diff '
-            "(exit status only).",
+            "Run git diff on each cloned member; extra arguments are passed through to git diff. "
+            "Everything after the first -- goes to git diff untouched; use it for git diff's own "
+            "revisions and paths, which are otherwise read as member names, and for options that "
+            "collide with this command's (e.g. -a). "
+            '"repospace -qq diff" relays --quiet to git diff (exit status only).',
             accepts_unknown_args=True,
             forward_dashdash=True,
         )
@@ -44,9 +41,8 @@ class Diff(MemberCommand):
 
     def do_run(self, args, unknown):
         self.die_if_no_git()
-        # git always sees a pipe (output is captured to interleave
-        # banners), so it must be told explicitly to color. Placed
-        # before the pass-through arguments so the user's flags win.
+        # git always sees a pipe (output is captured to interleave banners), so it must be told
+        # explicitly to color. Placed before the pass-through arguments so the user's flags win.
         color = ansi.use_color(sys.stdout, self.color_ui)
         differences = False
         for member in self.selected_members(
@@ -62,9 +58,8 @@ class Diff(MemberCommand):
             ]
             if color:
                 command.append("--color=always")
-            # A single -q only drops repospace's banners, keeping the
-            # patch output clean for piping; -qq relays quiet to git
-            # diff itself (exit status only, implies --exit-code).
+            # A single -q only drops repospace's banners, keeping the patch output clean for piping;
+            # -qq relays quiet to git diff itself (exit status only, implies --exit-code).
             if self.verbosity < Verbosity.WRN:
                 command.append("--quiet")
             result = member.git(
@@ -73,11 +68,10 @@ class Diff(MemberCommand):
                 capture_stderr=True,
                 check=False,
             )
-            # git diff exits 1 to signal differences under pass-through
-            # flags such as --exit-code; only higher codes are errors.
-            # A negative returncode (git died on a signal) maps to the
-            # conventional 128 + signal, as in Grep and main(); passed
-            # through, it would be truncated modulo 256.
+            # git diff exits 1 to signal differences under pass-through flags such as --exit-code;
+            # only higher codes are errors. A negative returncode (git died on a signal) maps to the
+            # conventional 128 + signal, as in Grep and main(); passed through, it would be
+            # truncated modulo 256.
             if result.returncode not in (0, 1):
                 detail = result.stderr.decode(errors="backslashreplace").strip() or (
                     f"git diff died on signal {-result.returncode}"
@@ -128,14 +122,11 @@ class ForAll(MemberCommand):
         super().__init__(
             "forall",
             "run a shell command in each member's directory",
-            "Run a shell command in each cloned member's directory. "
-            "The environment "
-            "contains REPOSPACE_MEMBER_NAME, REPOSPACE_MEMBER_PATH, "
-            "REPOSPACE_MEMBER_ABSPATH, REPOSPACE_MEMBER_REVISION, "
-            "REPOSPACE_MEMBER_URL, and REPOSPACE_MEMBER_REMOTE. "
-            "Every member runs, whatever the previous ones did; a "
-            "failure in any of them exits 1, or, if a command was "
-            "killed by a signal, with 128 + the first such signal.",
+            "Run a shell command in each cloned member's directory. The environment contains "
+            "REPOSPACE_MEMBER_NAME, REPOSPACE_MEMBER_PATH, REPOSPACE_MEMBER_ABSPATH, "
+            "REPOSPACE_MEMBER_REVISION, REPOSPACE_MEMBER_URL, and REPOSPACE_MEMBER_REMOTE. "
+            "Every member runs, whatever the previous ones did; a failure in any of them exits 1, "
+            "or, if a command was killed by a signal, with 128 + the first such signal.",
         )
 
     def do_add_parser(self, parser_adder):
@@ -159,12 +150,10 @@ class ForAll(MemberCommand):
     def do_run(self, args, unknown):
         """Run the command everywhere, then report every failure.
 
-        A command killed by a signal reports that signal and makes the
-        exit status 128 + it, as in Diff, Grep and main(); a negative
-        status would otherwise be truncated modulo 256. With more than
-        one, the first signal wins, since only one status can be
-        returned and no member's failure is more important than
-        another's.
+        A command killed by a signal reports that signal and makes the exit status 128 + it, as in
+        Diff, Grep and main(); a negative status would otherwise be truncated modulo 256. With more
+        than one, the first signal wins, since only one status can be returned and no member's
+        failure is more important than another's.
         """
         failed = []
         signal = None
@@ -186,7 +175,11 @@ class ForAll(MemberCommand):
                 failed.append((member, result.returncode))
         if failed:
             names = ", ".join(
-                f"{member.name_and_path} (killed by signal {-code})" if code < 0 else member.name_and_path
+                (
+                    f"{member.name_and_path} (killed by signal {-code})"
+                    if code < 0
+                    else member.name_and_path
+                )
                 for member, code in failed
             )
             self.err(f"command failed in: {names}")
@@ -198,9 +191,8 @@ class Compare(MemberCommand):
         super().__init__(
             "compare",
             "compare member checkouts against the manifest",
-            "Compare each cloned member's HEAD against repospace-rev "
-            "(the manifest revision as of the last update). By default "
-            "only members with differences are printed.",
+            "Compare each cloned member's HEAD against repospace-rev (the manifest revision as of "
+            "the last update). By default only members with differences are printed.",
         )
 
     def do_add_parser(self, parser_adder):
@@ -224,9 +216,9 @@ class Compare(MemberCommand):
         differences = 0
         for member in self.selected_members(args, only_cloned=True):
             if isinstance(member, ManifestMember):
-                # Only reachable by explicit naming; without an explicit
-                # member list, selected_members already excludes it.
-                self.die("the manifest repository has no repospace-rev and " "cannot be compared")
+                # Only reachable by explicit naming; without an explicit member list,
+                # selected_members already excludes it.
+                self.die("the manifest repository has no repospace-rev and cannot be compared")
             report = self._compare_one(member)
             if report is None:
                 if args.all:
@@ -251,15 +243,14 @@ class Compare(MemberCommand):
             capture_stderr=True,
         )
         if head.returncode != 0:
-            # repospace-rev exists but HEAD is unborn: an update was
-            # interrupted between update-ref and checkout.
+            # repospace-rev exists but HEAD is unborn: an update was interrupted between update-ref
+            # and checkout.
             return ['no commit checked out; run "repospace update"']
         head_sha = head.stdout.decode().strip()
-        # A branch name is a byte string git does not require to be
-        # valid UTF-8, and it is only ever printed here; undecodable
-        # bytes become escapes rather than an exception. Empty output
-        # means a ref named HEAD (e.g. a tag) made the name ambiguous,
-        # which is a detached HEAD just like the literal "HEAD".
+        # A branch name is a byte string git does not require to be valid UTF-8, and it is only ever
+        # printed here; undecodable bytes become escapes rather than an exception. Empty output
+        # means a ref named HEAD (e.g. a tag) made the name ambiguous, which is a detached HEAD just
+        # like the literal "HEAD".
         branch = (
             member.git(["rev-parse", "--abbrev-ref", "HEAD"], capture_stdout=True)
             .stdout.decode(errors="backslashreplace")
@@ -297,9 +288,8 @@ class Compare(MemberCommand):
 def _glob_escape(value: str) -> str:
     """Escape glob metacharacters so *value* matches literally.
 
-    ripgrep --glob patterns and grep --exclude-dir patterns are both
-    glob-matched, and both honor backslash escapes. Backslashes cannot
-    occur in member paths (the manifest layer rejects them).
+    ripgrep --glob patterns and grep --exclude-dir patterns are both glob-matched, and both honor
+    backslash escapes. Backslashes cannot occur in member paths (the manifest layer rejects them).
     """
     return "".join("\\" + c if c in "*?[]{}" else c for c in value)
 
@@ -323,13 +313,11 @@ class Grep(MemberCommand):
         super().__init__(
             "grep",
             "search members for a pattern",
-            "Search the manifest repository and cloned members for a "
-            "pattern, using git grep, ripgrep, or grep. Extra arguments "
-            "are passed to the tool. Everything after the first -- goes "
-            "to the tool untouched; use it for arguments that collide "
-            "with this command's own options (e.g. -m). "
-            '"repospace -qq grep" relays -q to the tool '
-            "(exit status only).",
+            "Search the manifest repository and cloned members for a pattern, using git grep, "
+            "ripgrep, or grep. Extra arguments are passed to the tool. Everything after the first "
+            "-- goes to the tool untouched; use it for arguments that collide with this command's "
+            "own options (e.g. -m). "
+            '"repospace -qq grep" relays -q to the tool (exit status only).',
             accepts_unknown_args=True,
             forward_dashdash=True,
         )
@@ -343,7 +331,7 @@ class Grep(MemberCommand):
             action="append",
             default=[],
             metavar="MEMBER",
-            help="restrict the search to this member (name or path); " "may be repeated",
+            help="restrict the search to this member (name or path); may be repeated",
         )
         parser.add_argument(
             "--tool",
@@ -354,11 +342,10 @@ class Grep(MemberCommand):
         return parser
 
     def _member_dir_exclusions(self, tool, searched):
-        """Options keeping the search of *searched* out of the
-        directories of the members nested inside it, which are searched
-        separately (git grep never sees them; they are separate
-        repositories, not tracked files). Member paths may nest, so
-        this is not the manifest repository's privilege."""
+        """Options keeping the search of *searched* out of the directories of the members nested
+        inside it, which are searched separately (git grep never sees them; they are separate
+        repositories, not tracked files). Member paths may nest, so this is not the manifest
+        repository's privilege."""
         base = posixpath.normpath(searched.path or ".")
         options = []
         for member in self.manifest.members:
@@ -368,14 +355,13 @@ class Grep(MemberCommand):
             if path is None:
                 continue
             if tool == "ripgrep":
-                # The leading "/" anchors the gitignore-style glob to
-                # the search root, excluding exactly the member path.
+                # The leading "/" anchors the gitignore-style glob to the search root, excluding
+                # exactly the member path.
                 options.append(f"--glob=!/{_glob_escape(path)}")
             else:
-                # grep can only exclude by directory name, so a
-                # directory that merely shares a nested member
-                # directory's basename is excluded too; the price of
-                # plain grep having no path-anchored filters.
+                # grep can only exclude by directory name, so a directory that merely shares a
+                # nested member directory's basename is excluded too; the price of plain grep having
+                # no path-anchored filters.
                 options.append(f"--exclude-dir={_glob_escape(posixpath.basename(path))}")
         return list(dict.fromkeys(options))
 
@@ -389,26 +375,25 @@ class Grep(MemberCommand):
         extra_args = []
         if extra:
             try:
-                # Shell-split, like aliases: quoted arguments (globs,
-                # patterns with spaces) reach the tool as one word.
+                # Shell-split, like aliases: quoted arguments (globs, patterns with spaces) reach
+                # the tool as one word.
                 extra_args = shlex.split(extra)
             except ValueError as err:
                 self.wrn(f"ignoring grep.{tool}-args ({err}): {extra}")
         if not unknown and not extra_args:
-            # With configured extras the tool is the judge: they may
-            # carry the pattern themselves (e.g. "-e foo").
+            # With configured extras the tool is the judge: they may carry the pattern themselves
+            # (e.g. "-e foo").
             self.die("missing search pattern")
 
-        # The tools always see a pipe (output is captured to interleave
-        # banners), so they must be told explicitly to color.
+        # The tools always see a pipe (output is captured to interleave banners), so they must be
+        # told explicitly to color.
         color = ansi.use_color(sys.stdout, self.color_ui)
 
         matched = False
         explicit = bool(args.members)
         for member in self.selected_members(args, include_manifest=True):
-            # The manifest repository's files are on disk whether or
-            # not it is a git repository (repospace init accepts a
-            # plain directory); only git grep requires one. Regular
+            # The manifest repository's files are on disk whether or not it is a git repository
+            # (repospace init accepts a plain directory); only git grep requires one. Regular
             # members have no content at all until cloned.
             if isinstance(member, ManifestMember):
                 if tool == "git-grep" and not member.is_cloned():
@@ -431,9 +416,8 @@ class Grep(MemberCommand):
                 command = [tool_path or "rg"]
                 command += self._member_dir_exclusions(tool, member)
             else:
-                # Plain grep has no gitignore support; at least keep it
-                # out of the git object and metadata directories, in
-                # every repository searched.
+                # Plain grep has no gitignore support; at least keep it out of the git object and
+                # metadata directories, in every repository searched.
                 command = [
                     tool_path or "grep",
                     "-r",
@@ -443,9 +427,8 @@ class Grep(MemberCommand):
                 command += self._member_dir_exclusions(tool, member)
             if color:
                 command.append("--color=always")
-            # A single -q only drops repospace's banners, keeping the
-            # match output clean for piping; -qq relays quiet to the
-            # tool itself (exit status only). All three tools take -q.
+            # A single -q only drops repospace's banners, keeping the match output clean for piping;
+            # -qq relays quiet to the tool itself (exit status only). All three tools take -q.
             if self.verbosity < Verbosity.WRN:
                 command.append("-q")
             command += extra_args + unknown
@@ -462,31 +445,30 @@ class Grep(MemberCommand):
                 )
             except FileNotFoundError:
                 self.die(
-                    f'search tool not found: "{command[0]}"; use ' f"--tool-path or set the grep.{tool}-path option"
+                    f'search tool not found: "{command[0]}"; use '
+                    f"--tool-path or set the grep.{tool}-path option"
                 )
             except OSError as err:
-                # E.g. a --tool-path that exists but is not executable;
-                # same clean exit as a missing tool, not a traceback.
+                # E.g. a --tool-path that exists but is not executable; same clean exit as a missing
+                # tool, not a traceback.
                 self.die(
                     f'cannot run the search tool "{command[0]}": {err}; '
                     f"use --tool-path or set the grep.{tool}-path option"
                 )
             if result.returncode == 0:
-                # Exit status, not output, decides: with a quiet flag
-                # (relayed or passed by the user) the tools match
-                # silently.
+                # Exit status, not output, decides: with a quiet flag (relayed or passed by the
+                # user) the tools match silently.
                 matched = True
                 if result.stdout:
                     self.banner(f"{member.name_and_path}:")
                     print(result.stdout, end="")
             elif result.returncode != 1:
-                # 1 means "no matches"; anything else, including a
-                # negative returncode (tool killed by a signal), is an
-                # error.
+                # 1 means "no matches"; anything else, including a negative returncode (tool killed
+                # by a signal), is an error.
                 detail = result.stderr.strip() or (
                     f"search tool died on signal {-result.returncode}"
                     if result.returncode < 0
-                    else "search tool exited with status " f"{result.returncode}"
+                    else f"search tool exited with status {result.returncode}"
                 )
                 self.err(f"{member.name_and_path}: {detail}")
                 code = result.returncode

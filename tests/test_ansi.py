@@ -31,8 +31,8 @@ def test_non_tty_disables():
 
 
 def test_closed_stream_disables(tmp_path):
-    # isatty() raises ValueError on a closed stream; deciding on a
-    # color must not fail an otherwise good command.
+    # isatty() raises ValueError on a closed stream; deciding on a color must not fail an otherwise
+    # good command.
     stream = open(tmp_path / "closed", "w")
     stream.close()
     assert ansi.use_color(stream) is False

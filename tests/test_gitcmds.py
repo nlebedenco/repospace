@@ -58,7 +58,11 @@ def test_list_unknown_key(updated, run_repospace):
 
 def test_list_inactive_filtering(updated, run_repospace):
     updated.rewrite_app_yaml(
-        extra_members=("    - name: libd\n" f"      url: {updated.url(updated.libc_src)}\n" "      groups: [opt]\n"),
+        extra_members=(
+            "    - name: libd\n"
+            f"      url: {updated.url(updated.libc_src)}\n"
+            "      groups: [opt]\n"
+        ),
         group_filter="-opt",
     )
     out, _ = run(run_repospace, updated, "list")
@@ -78,7 +82,9 @@ def test_list_stale_revision_changed(updated, run_repospace):
 
 
 def test_list_stale_added_member(updated, run_repospace):
-    updated.rewrite_app_yaml(extra_members=("    - name: ghost\n" f"      url: {updated.url(updated.libc_src)}\n"))
+    updated.rewrite_app_yaml(
+        extra_members=("    - name: ghost\n" f"      url: {updated.url(updated.libc_src)}\n")
+    )
     out, _ = run(run_repospace, updated, "list")
     ghost_line = [ln for ln in out.splitlines() if ln.startswith("ghost")][0]
     assert "not-cloned" in ghost_line
@@ -95,8 +101,8 @@ def test_list_stale_diverged(updated, run_repospace):
 
 
 def test_list_no_repospace_rev_without_git_noise(updated, run_repospace):
-    # A missing repospace-rev is a normal staleness outcome; git's
-    # "fatal: ..." from the probing rev-parse must not leak to stderr.
+    # A missing repospace-rev is a normal staleness outcome; git's "fatal: ..." from the probing
+    # rev-parse must not leak to stderr.
     subprocess.run(
         [
             "git",
@@ -122,7 +128,11 @@ def test_list_no_snapshot_warning(updated, run_repospace):
 
 def test_list_orphan_warning(updated, run_repospace):
     yaml_file = updated.app / "repospace.yaml"
-    text = "\n".join(line for line in yaml_file.read_text().splitlines() if "libb" not in line and "v1.0" not in line)
+    text = "\n".join(
+        line
+        for line in yaml_file.read_text().splitlines()
+        if "libb" not in line and "v1.0" not in line
+    )
     yaml_file.write_text(text + "\n")
     out, err = run(run_repospace, updated, "list")
     assert 'member "libb" from the last update' in err
@@ -148,8 +158,8 @@ def test_manifest_path(updated, run_repospace):
 
 
 def test_manifest_file_config_escape_rejected(updated, run_repospace):
-    # manifest.file has the same confinement as imports: it cannot
-    # point outside the manifest repository.
+    # manifest.file has the same confinement as imports: it cannot point outside the manifest
+    # repository.
     run(run_repospace, updated, "config", "manifest.file", "../evil.yaml")
     out, err = run(run_repospace, updated, "manifest", "--path", expect=1)
     assert "escapes" in err
@@ -177,7 +187,9 @@ def test_manifest_freeze(updated, run_repospace):
 
 
 def test_manifest_freeze_uncloned_member_fails_cleanly(updated, run_repospace):
-    updated.rewrite_app_yaml(extra_members=("    - name: ghost\n" f"      url: {updated.url(updated.libc_src)}\n"))
+    updated.rewrite_app_yaml(
+        extra_members=("    - name: ghost\n" f"      url: {updated.url(updated.libc_src)}\n")
+    )
     out, err = run(run_repospace, updated, "manifest", "--freeze", expect=1)
     assert "cannot freeze" in err
     assert "ghost" in err
@@ -185,12 +197,13 @@ def test_manifest_freeze_uncloned_member_fails_cleanly(updated, run_repospace):
 
 
 def test_manifest_freeze_inactive_member_error_names_escapes(updated, run_repospace):
-    # Plain "repospace update" skips inactive members, so for them the
-    # generic "run repospace update" advice would be a dead end; the
-    # error must name the ways that actually work.
+    # Plain "repospace update" skips inactive members, so for them the generic "run repospace
+    # update" advice would be a dead end; the error must name the ways that actually work.
     updated.rewrite_app_yaml(
         extra_members=(
-            "    - name: ghost\n" f"      url: {updated.url(updated.libc_src)}\n" "      groups: [optional]\n"
+            "    - name: ghost\n"
+            f"      url: {updated.url(updated.libc_src)}\n"
+            "      groups: [optional]\n"
         ),
         group_filter="-optional",
     )
@@ -262,8 +275,8 @@ def test_diff_relays_repospace_qq(updated, run_repospace):
 
 
 def test_diff_dashdash_passes_flags_through(updated, run_repospace):
-    # The documented escape: after --, -a belongs to git diff (--text),
-    # not to this command (--all), and is not a member name.
+    # The documented escape: after --, -a belongs to git diff (--text), not to this command (--all),
+    # and is not a member name.
     out, err = run(run_repospace, updated, "diff", "--", "-a")
     assert out == ""
     assert "unknown member" not in err
@@ -281,8 +294,8 @@ def test_diff_members_precede_dashdash(updated, run_repospace):
 
 
 def test_diff_revision_positional_hints_dashdash(updated, run_repospace):
-    # git diff's own positionals (revisions, paths) are read as member
-    # names; the error says where they belong.
+    # git diff's own positionals (revisions, paths) are read as member names; the error says where
+    # they belong.
     code, out, err = run_repospace(["diff", "HEAD"], cwd=updated.ws)
     assert code == 1
     assert "unknown member(s): HEAD" in err
@@ -292,8 +305,8 @@ def test_diff_revision_positional_hints_dashdash(updated, run_repospace):
 
 
 def test_diff_signal_death_maps_exit_code(updated, run_repospace, monkeypatch):
-    # git diff killed by a signal exits with the conventional
-    # 128 + signal, not a negative code truncated modulo 256.
+    # git diff killed by a signal exits with the conventional 128 + signal, not a negative code
+    # truncated modulo 256.
     from repospace.manifest import Member
 
     real_git = Member.git
@@ -316,8 +329,7 @@ def test_status(updated, run_repospace):
 
 
 def test_status_relays_repospace_verbose(updated, run_repospace):
-    # "repospace -v status" relays --verbose to git status, which shows
-    # the diff of staged changes.
+    # "repospace -v status" relays --verbose to git status, which shows the diff of staged changes.
     libb = updated.ws / "libb"
     (libb / "libb.txt").write_text("staged change\n")
     subprocess.run(["git", "-C", str(libb), "add", "-A"], check=True)
@@ -329,7 +341,9 @@ def test_status_relays_repospace_verbose(updated, run_repospace):
 
 
 def test_status_named_uncloned_member_fails(updated, run_repospace):
-    updated.rewrite_app_yaml(extra_members=("    - name: ghost\n" f"      url: {updated.url(updated.libc_src)}\n"))
+    updated.rewrite_app_yaml(
+        extra_members=("    - name: ghost\n" f"      url: {updated.url(updated.libc_src)}\n")
+    )
     out, err = run(run_repospace, updated, "status", "ghost", expect=1)
     assert "ghost" in err
     assert "not cloned" in err
@@ -375,9 +389,8 @@ def test_forall_failure(updated, run_repospace):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: signals")
 def test_forall_signal_death_maps_exit_code(updated, run_repospace):
-    # A command killed by a signal exits with the conventional
-    # 128 + signal, as in diff and grep, and is reported as killed
-    # rather than as an ordinary non-zero status.
+    # A command killed by a signal exits with the conventional 128 + signal, as in diff and grep,
+    # and is reported as killed rather than as an ordinary non-zero status.
     out, err = run(run_repospace, updated, "forall", "-c", "kill -SEGV $$", expect=139)
     assert "killed by signal 11" in err
 
@@ -409,8 +422,8 @@ def test_compare_dirty(updated, run_repospace):
 
 
 def test_compare_unborn_head(updated, run_repospace):
-    # repospace-rev exists but no commit is checked out: an update
-    # interrupted between update-ref and checkout.
+    # repospace-rev exists but no commit is checked out: an update interrupted between update-ref
+    # and checkout.
     libb = updated.ws / "libb"
     subprocess.run(
         ["git", "-C", str(libb), "symbolic-ref", "HEAD", "refs/heads/never-born"],
@@ -423,8 +436,8 @@ def test_compare_unborn_head(updated, run_repospace):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: non-UTF-8 ref names")
 def test_compare_non_utf8_branch_name(updated, run_repospace):
-    # A branch name that is not valid UTF-8 is reported with the
-    # undecodable byte escaped; it must not cost the whole comparison.
+    # A branch name that is not valid UTF-8 is reported with the undecodable byte escaped; it must
+    # not cost the whole comparison.
     libb = updated.ws / "libb"
     subprocess.run(
         [
@@ -445,9 +458,8 @@ def test_compare_non_utf8_branch_name(updated, run_repospace):
 
 
 def test_compare_ref_named_head(updated, run_repospace):
-    # A tag named HEAD makes "rev-parse --abbrev-ref HEAD" succeed with
-    # empty output; the member is detached and up to date, so there is
-    # nothing to report and --exit-code must stay happy.
+    # A tag named HEAD makes "rev-parse --abbrev-ref HEAD" succeed with empty output; the member is
+    # detached and up to date, so there is nothing to report and --exit-code must stay happy.
     libb = updated.ws / "libb"
     subprocess.run(["git", "-C", str(libb), "tag", "HEAD"], check=True)
     out, _ = run(run_repospace, updated, "compare", "--exit-code")
@@ -455,8 +467,8 @@ def test_compare_ref_named_head(updated, run_repospace):
 
 
 def test_compare_manifest_member_rejected(updated, run_repospace):
-    # Naming the manifest repository explicitly is an error, not a
-    # silent no-op; it has no repospace-rev to compare against.
+    # Naming the manifest repository explicitly is an error, not a silent no-op; it has no
+    # repospace-rev to compare against.
     code, out, err = run_repospace(["compare", "manifest"], cwd=updated.ws)
     assert code == 1
     assert "cannot be compared" in err
@@ -476,17 +488,16 @@ def test_grep_no_match(updated, run_repospace):
 
 
 def test_grep_passes_tool_flags_through(updated, run_repospace):
-    # After the command name, -v belongs to the tool (git grep invert
-    # match), not to repospace verbosity.
+    # After the command name, -v belongs to the tool (git grep invert match), not to repospace
+    # verbosity.
     out, _ = run(run_repospace, updated, "grep", "-v", "hello from liba")
     # Every file except the one containing the greeting still matches.
     assert "libb.txt" in out
 
 
 def test_grep_tool_args_config_shell_quoting(updated, run_repospace):
-    # grep.<tool>-args values are shell-split like aliases: a quoted
-    # argument with spaces reaches the tool as one word, without
-    # literal quotes.
+    # grep.<tool>-args values are shell-split like aliases: a quoted argument with spaces reaches
+    # the tool as one word, without literal quotes.
     run_repospace(
         ["config", "grep.git-grep-args", "-e 'hello from liba'"],
         cwd=updated.ws,
@@ -496,8 +507,7 @@ def test_grep_tool_args_config_shell_quoting(updated, run_repospace):
 
 
 def test_grep_tool_args_config_malformed(updated, run_repospace):
-    # An unbalanced quote must not break grep; warn and search without
-    # the configured extras.
+    # An unbalanced quote must not break grep; warn and search without the configured extras.
     run_repospace(["config", "grep.git-grep-args", "don't"], cwd=updated.ws)
     code, out, err = run_repospace(["grep", "hello from liba"], cwd=updated.ws)
     assert code == 0
@@ -506,16 +516,15 @@ def test_grep_tool_args_config_malformed(updated, run_repospace):
 
 
 def test_grep_dashdash_passes_flags_through(updated, run_repospace):
-    # The documented escape: after --, -m belongs to the tool (git grep
-    # max-count), not to this command (--member).
+    # The documented escape: after --, -m belongs to the tool (git grep max-count), not to this
+    # command (--member).
     updated.repos.commit(updated.app, {"notes.txt": "GREP_TOKEN\nGREP_TOKEN\n"}, "notes")
     out, _ = run(run_repospace, updated, "grep", "--", "-m", "1", "GREP_TOKEN")
     assert out.count("GREP_TOKEN") == 1
 
 
 def test_grep_user_quiet_flag_still_matches(updated, run_repospace):
-    # A user-passed -q makes the tool match silently; the exit status
-    # must still reflect the match.
+    # A user-passed -q makes the tool match silently; the exit status must still reflect the match.
     code, out, err = run_repospace(["grep", "-q", "hello from liba"], cwd=updated.ws)
     assert code == 0
     assert out == ""
@@ -540,13 +549,17 @@ def test_grep_member_dir_exclusions_escape_glob_metachars():
     from repospace.manifest import Manifest
 
     manifest = Manifest.from_data(
-        "manifest:\n" "  members:\n" "    - name: weird\n" "      url: u\n" '      path: "lib[x]/w*"\n'
+        "manifest:\n"
+        "  members:\n"
+        "    - name: weird\n"
+        "      url: u\n"
+        '      path: "lib[x]/w*"\n'
     )
     command = Grep()
     command.manifest = manifest
     searched = manifest.members[0]
-    # Metacharacters in member paths must match literally, not as glob
-    # syntax, in both tools' exclusion patterns.
+    # Metacharacters in member paths must match literally, not as glob syntax, in both tools'
+    # exclusion patterns.
     assert command._member_dir_exclusions("ripgrep", searched) == ["--glob=!/lib\\[x\\]/w\\*"]
     assert command._member_dir_exclusions("grep", searched) == ["--exclude-dir=w\\*"]
 
@@ -569,8 +582,8 @@ def test_grep_member_dir_exclusions_only_nested_members():
     command = Grep()
     command.manifest = manifest
     by_name = {m.name: m for m in manifest.members}
-    # A member's own search excludes what is nested inside it, named
-    # relative to it, and nothing else.
+    # A member's own search excludes what is nested inside it, named relative to it, and nothing
+    # else.
     assert command._member_dir_exclusions("ripgrep", by_name["outer"]) == ["--glob=!/inner"]
     assert command._member_dir_exclusions("ripgrep", by_name["inner"]) == []
     assert command._member_dir_exclusions("ripgrep", by_name["sibling"]) == []
@@ -600,8 +613,8 @@ def test_grep_member_restriction(updated, run_repospace):
 
 
 def test_grep_plain_tool_skips_metadata(updated, run_repospace):
-    # .repospace/packages.cmake contains this token; the plain grep tool
-    # must not descend into the metadata directory.
+    # .repospace/packages.cmake contains this token; the plain grep tool must not descend into the
+    # metadata directory.
     run(
         run_repospace,
         updated,
@@ -614,8 +627,8 @@ def test_grep_plain_tool_skips_metadata(updated, run_repospace):
 
 
 def test_grep_plain_tool_skips_member_git_dirs(updated, run_repospace):
-    # Every repository's .git/config contains this key; the plain grep
-    # tool must not descend into git metadata in members either.
+    # Every repository's .git/config contains this key; the plain grep tool must not descend into
+    # git metadata in members either.
     run(
         run_repospace,
         updated,
@@ -628,8 +641,8 @@ def test_grep_plain_tool_skips_member_git_dirs(updated, run_repospace):
 
 
 def test_grep_plain_tool_no_duplicate_member_hits(updated, run_repospace):
-    # The manifest-repository pass must not descend into member
-    # directories; they are searched separately.
+    # The manifest-repository pass must not descend into member directories; they are searched
+    # separately.
     (updated.ws / "liba" / "grep-dedup.txt").write_text("GREP_DEDUP_TOKEN\n")
     out, _ = run(run_repospace, updated, "grep", "--tool", "grep", "GREP_DEDUP_TOKEN")
     assert out.count("GREP_DEDUP_TOKEN") == 1
@@ -655,7 +668,9 @@ def nested_member_repospace(repospace, run_repospace):
     """Update a topology with "inner" nested inside liba's directory."""
     repospace.rewrite_app_yaml(
         extra_members=(
-            "    - name: inner\n" f"      url: {repospace.url(repospace.libc_src)}\n" "      path: liba/inner\n"
+            "    - name: inner\n"
+            f"      url: {repospace.url(repospace.libc_src)}\n"
+            "      path: liba/inner\n"
         )
     )
     code, out, err = run_repospace(["update"], cwd=repospace.ws)
@@ -665,8 +680,8 @@ def nested_member_repospace(repospace, run_repospace):
 
 
 def test_grep_plain_tool_no_duplicate_nested_member_hits(repospace, run_repospace):
-    # Member paths may nest. The enclosing member's search must not
-    # descend into the nested one, which is searched separately.
+    # Member paths may nest. The enclosing member's search must not descend into the nested one,
+    # which is searched separately.
     ws = nested_member_repospace(repospace, run_repospace)
     out, _ = run(run_repospace, ws, "grep", "--tool", "grep", "GREP_NESTED_TOKEN")
     assert out.count("GREP_NESTED_TOKEN") == 1
@@ -682,16 +697,15 @@ def test_grep_ripgrep_no_duplicate_nested_member_hits(repospace, run_repospace):
 
 
 def test_grep_pattern_from_tool_args_config(updated, run_repospace):
-    # Configured extras may carry the pattern themselves, so a bare
-    # "repospace grep" is not necessarily patternless.
+    # Configured extras may carry the pattern themselves, so a bare "repospace grep" is not
+    # necessarily patternless.
     run_repospace(
         ["config", "grep.git-grep-args", "-e 'hello from liba'"],
         cwd=updated.ws,
     )
     out, _ = run(run_repospace, updated, "grep")
     assert "hello from liba" in out
-    # Without them, and without a pattern on the command line, the
-    # search cannot be run.
+    # Without them, and without a pattern on the command line, the search cannot be run.
     run_repospace(["config", "-d", "grep.git-grep-args"], cwd=updated.ws)
     out, err = run(run_repospace, updated, "grep", expect=1)
     assert "missing search pattern" in err
@@ -714,8 +728,8 @@ def test_grep_missing_tool(updated, run_repospace):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: file modes")
 def test_grep_tool_not_executable(updated, run_repospace, tmp_path):
-    # A tool path that exists but cannot be executed is as much a
-    # configuration error as a missing one, and dies the same way.
+    # A tool path that exists but cannot be executed is as much a configuration error as a missing
+    # one, and dies the same way.
     if os.geteuid() == 0:
         pytest.skip("root is not stopped by the execute bit")
     tool = tmp_path / "unrunnable"
@@ -757,9 +771,8 @@ def test_grep_tool_killed_by_signal(updated, run_repospace, tmp_path):
 
 
 def test_grep_non_git_manifest_repository(run_repospace, tmp_path):
-    # repospace init accepts a plain (non-git) directory; grep must
-    # still search it with the non-git tools, and say why git grep
-    # cannot instead of silently skipping it.
+    # repospace init accepts a plain (non-git) directory; grep must still search it with the non-git
+    # tools, and say why git grep cannot instead of silently skipping it.
     ws = tmp_path / "plainws"
     (ws / ".repospace").mkdir(parents=True)
     (ws / "repospace.yaml").write_text("manifest:\n")

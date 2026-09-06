@@ -1,7 +1,7 @@
 """Command framework: the RepospaceCommand base class and extension loading.
 
-Extension authors subclass RepospaceCommand and describe their commands in a
-YAML specification file (conventionally ``repospace-commands.yaml``)::
+Extension authors subclass RepospaceCommand and describe their commands in a YAML specification file
+(conventionally ``repospace-commands.yaml``)::
 
     extension-commands:
       - file: scripts/my_extension.py
@@ -10,11 +10,10 @@ YAML specification file (conventionally ``repospace-commands.yaml``)::
             class: MyCommand      # optional, defaults to the name
             help: one-line help   # optional
 
-The path in the manifest's ``extension-commands`` attribute and the ``file:``
-keys inside the specification are both relative to the member's root
-directory. Extension modules are imported lazily, only when the command is
-actually invoked, and the command class must be constructible with no
-arguments.
+The path in the manifest's ``extension-commands`` attribute and the ``file:`` keys inside the
+specification are both relative to the member's root directory. Extension modules are imported
+lazily, only when the command is actually invoked, and the command class must be constructible with
+no arguments.
 """
 
 from __future__ import annotations
@@ -80,15 +79,14 @@ class Verbosity(enum.IntEnum):
 class HelpFormatter(argparse.HelpFormatter):
     """Fill hand-written help text to the terminal width.
 
-    The default formatter collapses the whole description into a
-    single paragraph and RawDescriptionHelpFormatter keeps the
-    source's short lines; neither fits a multi-paragraph description.
-    This one re-wraps to the terminal width while preserving paragraph
-    breaks and a hand-written argument list (as in "repospace init").
+    The default formatter collapses the whole description into a single paragraph and
+    RawDescriptionHelpFormatter keeps the source's short lines; neither fits a multi-paragraph
+    description. This one re-wraps to the terminal width while preserving paragraph breaks and a
+    hand-written argument list (as in "repospace init").
     """
 
-    #: An argument-list entry: a two-space indented name, two or more
-    #: spaces, then the first line of its help text.
+    #: An argument-list entry: a two-space indented name, two or more spaces, then the first line of
+    #: its help text.
     _ENTRY = re.compile(r"^  (\S.*?)\s{2,}(\S.*)$")
     #: Column where an entry's help text starts.
     _HELP_COLUMN = 20
@@ -96,8 +94,8 @@ class HelpFormatter(argparse.HelpFormatter):
     def _format_usage(self, usage, actions, groups, prefix):
         if usage is None:
             return super()._format_usage(usage, actions, groups, prefix)
-        # argparse emits a caller-supplied usage string verbatim; wrap
-        # it on option boundaries like a generated one.
+        # argparse emits a caller-supplied usage string verbatim; wrap it on option boundaries like
+        # a generated one.
         if prefix is None:
             prefix = "usage: "
         width = max(self._width - self._current_indent, 11)
@@ -180,11 +178,9 @@ class RepospaceCommand(ABC):
         self.help = help
         self.description = description
         self.accepts_unknown_args = accepts_unknown_args
-        # With forward_dashdash, the dispatcher forwards everything after
-        # the first "--" as unknown arguments instead of letting argparse
-        # assign it to positionals (such as MEMBER); a later "--" is
-        # forwarded too, so the underlying tool's own separator stays
-        # reachable.
+        # With forward_dashdash, the dispatcher forwards everything after the first "--" as unknown
+        # arguments instead of letting argparse assign it to positionals (such as MEMBER); a later
+        # "--" is forwarded too, so the underlying tool's own separator stays reachable.
         self.forward_dashdash = forward_dashdash
         self.requires_repospace = requires_repospace
         self.verbosity = verbosity
@@ -260,7 +256,8 @@ class RepospaceCommand(ABC):
     def config(self):
         if self._config is None:
             self.die(
-                f"can't run repospace {self.name}; it requires configuration " "options, which were not available."
+                f"can't run repospace {self.name}; it requires configuration "
+                "options, which were not available."
             )
         return self._config
 
@@ -279,14 +276,13 @@ class RepospaceCommand(ABC):
         try:
             return self._config.getboolean("color.ui", default=True)
         except MalformedConfig as err:
-            # Like a broken commands.allow-extensions value: a value
-            # getboolean rejects must not take down every invocation
-            # (including the "config -d" that would remove it). Every
-            # output helper reads this property, so raising here would
-            # replace genuine errors with this one.
+            # Like a broken commands.allow-extensions value: a value getboolean rejects must not
+            # take down every invocation (including the "config -d" that would remove it). Every
+            # output helper reads this property, so raising here would replace genuine errors with
+            # this one.
             #
-            # The flag is set before warning, and checked above: wrn()
-            # colorizes, which reads this property again.
+            # The flag is set before warning, and checked above: wrn() colorizes, which reads this
+            # property again.
             self._color_ui_broken = True
             self.wrn(f"{err}; assuming the default")
             return True
@@ -300,9 +296,8 @@ class RepospaceCommand(ABC):
 
     def dbg(self, *args, level: Verbosity = Verbosity.DBG, end="\n"):
         if self.verbosity >= level:
-            # Flushed like the other helpers: _log_subprocess prints
-            # through here right before spawning a child, and the line
-            # must precede the child's output when stdout is a pipe.
+            # Flushed like the other helpers: _log_subprocess prints through here right before
+            # spawning a child, and the line must precede the child's output when stdout is a pipe.
             print(*args, end=end, flush=True)
 
     def inf(self, *args, colorize: bool = False, end="\n"):
@@ -311,8 +306,8 @@ class RepospaceCommand(ABC):
         text = " ".join(str(a) for a in args)
         if colorize:
             text = self._colorize(text, ansi.GREEN, sys.stdout)
-        # Flushed like the other helpers, so output stays ordered with
-        # child-process output when stdout is a pipe.
+        # Flushed like the other helpers, so output stays ordered with child-process output when
+        # stdout is a pipe.
         print(text, end=end, flush=True)
 
     def wrn(self, *args, end="\n"):
@@ -343,8 +338,7 @@ class RepospaceCommand(ABC):
         raise SystemExit(exit_code)
 
     def banner(self, *args):
-        # Flushed so banners stay ordered with child-process output
-        # when stdout is a pipe.
+        # Flushed so banners stay ordered with child-process output when stdout is a pipe.
         if self.verbosity < Verbosity.INF:
             return
         text = "=== " + " ".join(str(a) for a in args)
@@ -375,8 +369,8 @@ class RepospaceCommand(ABC):
         return subprocess.check_output(args, **kwargs)
 
     def run_subprocess(self, args, **kwargs):
-        # No defaults injected: setting e.g. "errors" here would silently
-        # switch subprocess.run into text mode for every caller.
+        # No defaults injected: setting e.g. "errors" here would silently switch subprocess.run into
+        # text mode for every caller.
         self._log_subprocess(args, kwargs.get("cwd"))
         return subprocess.run(args, **kwargs)
 
@@ -396,9 +390,9 @@ _EXT_SCHEMA_ERROR = "invalid extension-commands specification"
 
 _module_names = (f"repospace.commands.ext.cmd_{i}" for i in itertools.count(1))
 
-# Cache of already-imported extension modules, keyed by resolved path so a
-# file imported through different spellings (case, slashes, symlinks) is
-# imported only once even if it keeps module-level state.
+# Cache of already-imported extension modules, keyed by resolved path so a file imported through
+# different spellings (case, slashes, symlinks) is imported only once even if it keeps module-level
+# state.
 _EXT_MODULES_CACHE: Dict[Path, Any] = {}
 
 
@@ -419,16 +413,16 @@ class _ExtFactory:
         except KeyboardInterrupt:
             raise
         except (Exception, SystemExit) as err:
-            # SystemExit too: a constructor calling sys.exit() would
-            # otherwise end repospace with the extension's own code and
-            # no diagnostic at all.
+            # SystemExit too: a constructor calling sys.exit() would otherwise end repospace with
+            # the extension's own code and no diagnostic at all.
             raise ExtensionCommandError(hint=f"command constructor threw an exception: {err}")
         if not isinstance(command, RepospaceCommand):
-            raise ExtensionCommandError(hint=f"{self.attr} in {self.py_file} is not a " "RepospaceCommand")
+            raise ExtensionCommandError(
+                hint=f"{self.attr} in {self.py_file} is not a RepospaceCommand"
+            )
         if command.name != self.name:
-            # Dispatch found the command under the specification's
-            # name; a class registering another name would only fail
-            # later with a bare argparse "invalid choice" error.
+            # Dispatch found the command under the specification's name; a class registering another
+            # name would only fail later with a bare argparse "invalid choice" error.
             raise ExtensionCommandError(
                 hint=f"{self.attr} in {self.py_file} names itself "
                 f'"{command.name}", but the specification declares '
@@ -439,13 +433,11 @@ class _ExtFactory:
     def _import(self):
         """Import the extension module, or raise ExtensionCommandError.
 
-        The module's own directory joins sys.path so it can import
-        sibling helper modules naturally. It is appended rather than
-        prepended, so an extension directory cannot shadow the standard
-        library, and it stays only if the import succeeded. Sibling
-        modules do share one global namespace: when two extensions each
-        ship a "helper.py", both see whichever was imported first, which
-        no sys.path ordering can change.
+        The module's own directory joins sys.path so it can import sibling helper modules naturally.
+        It is appended rather than prepended, so an extension directory cannot shadow the standard
+        library, and it stays only if the import succeeded. Sibling modules do share one global
+        namespace: when two extensions each ship a "helper.py", both see whichever was imported
+        first, which no sys.path ordering can change.
         """
         parent = os.path.dirname(self.py_file)
         added = parent not in sys.path
@@ -460,18 +452,19 @@ class _ExtFactory:
             # The user's interrupt, not the extension's failure.
             raise
         except (Exception, SystemExit) as err:
-            # Extension modules are arbitrary user code; any failure at
-            # import time becomes a clean error, not a traceback.
-            # _module_from_file re-raises BaseException, so SystemExit
-            # arrives here too: without this, an extension calling
-            # sys.exit() at import time would end repospace with the
-            # extension's own code and nothing said about why.
-            detail = f"it called sys.exit({err.code!r}) at import time" if isinstance(err, SystemExit) else str(err)
+            # Extension modules are arbitrary user code; any failure at import time becomes a clean
+            # error, not a traceback. _module_from_file re-raises BaseException, so SystemExit
+            # arrives here too: without this, an extension calling sys.exit() at import time would
+            # end repospace with the extension's own code and nothing said about why.
+            detail = (
+                f"it called sys.exit({err.code!r}) at import time"
+                if isinstance(err, SystemExit)
+                else str(err)
+            )
             raise ExtensionCommandError(hint=f"could not import {self.py_file}: {detail}")
         finally:
-            # A failed import leaves nothing behind on sys.path. (The
-            # module's own code may have edited it; only remove what is
-            # still there.)
+            # A failed import leaves nothing behind on sys.path. (The module's own code may have
+            # edited it; only remove what is still there.)
             if added and not loaded and parent in sys.path:
                 sys.path.remove(parent)
 
@@ -486,9 +479,8 @@ def _module_from_file(file: str):
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load {file}")
     module = importlib.util.module_from_spec(spec)
-    # Registered before exec_module, as importlib documents: the module
-    # must be findable by name while its own top-level code runs
-    # (dataclasses with deferred annotations, get_type_hints, and
+    # Registered before exec_module, as importlib documents: the module must be findable by name
+    # while its own top-level code runs (dataclasses with deferred annotations, get_type_hints, and
     # pickle all look it up in sys.modules).
     sys.modules[name] = module
     try:
@@ -513,9 +505,9 @@ class ExtCommandSpec:
 def extension_commands(config, manifest) -> "Dict[str, List[ExtCommandSpec]]":
     """Discover extension commands from all members, without loading them.
 
-    Returns an ordered mapping from member path to that member's specs, in
-    manifest resolution order. Nothing is imported here; each spec's factory
-    imports and instantiates its command class on first call.
+    Returns an ordered mapping from member path to that member's specs, in manifest resolution
+    order. Nothing is imported here; each spec's factory imports and instantiates its command class
+    on first call.
     """
     result: Dict[str, List[ExtCommandSpec]] = {}
     if config is not None and not config.getboolean("commands.allow-extensions", default=True):
@@ -538,7 +530,8 @@ def _member_specs(member) -> List[ExtCommandSpec]:
         spec_file = os.path.join(root, spec_rel)
         if util.escapes_directory(spec_file, root):
             raise ExtensionCommandError(
-                hint=f"{member.name}: extension-commands path {spec_rel} " "escapes the member directory"
+                hint=f"{member.name}: extension-commands path {spec_rel} "
+                "escapes the member directory"
             )
         if not os.path.isfile(spec_file):
             # The member may not be cloned yet; ignore silently.
@@ -554,33 +547,47 @@ def _specs_from_file(member, root: str, spec_file: str):
     except OSError as err:
         raise ExtensionCommandError(hint=f"{spec_file}: cannot read: {err}")
     except UnicodeDecodeError as err:
-        # One member's undecodable file must not become a traceback out
-        # of every invocation, down to "repospace topdir".
+        # One member's undecodable file must not become a traceback out of every invocation, down to
+        # "repospace topdir".
         raise ExtensionCommandError(hint=f"{spec_file}: not valid UTF-8: {err}")
     except yaml.YAMLError as err:
         raise ExtensionCommandError(hint=f"{spec_file}: cannot parse YAML: {err}")
     if not isinstance(data, dict) or not isinstance(data.get("extension-commands"), list):
-        raise ExtensionCommandError(hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: expected an " '"extension-commands" list')
+        raise ExtensionCommandError(
+            hint=f'{spec_file}: {_EXT_SCHEMA_ERROR}: expected an "extension-commands" list'
+        )
     specs = []
     for entry in data["extension-commands"]:
-        ok = isinstance(entry, dict) and isinstance(entry.get("file"), str) and isinstance(entry.get("commands"), list)
+        ok = (
+            isinstance(entry, dict)
+            and isinstance(entry.get("file"), str)
+            and isinstance(entry.get("commands"), list)
+        )
         if not ok:
             raise ExtensionCommandError(
-                hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: each entry needs " '"file" and "commands"'
+                hint=f'{spec_file}: {_EXT_SCHEMA_ERROR}: each entry needs "file" and "commands"'
             )
         py_file = os.path.join(root, entry["file"])
         if util.escapes_directory(py_file, root):
-            raise ExtensionCommandError(hint=f'{spec_file}: file {entry["file"]} escapes the ' "member directory")
+            raise ExtensionCommandError(
+                hint=f'{spec_file}: file {entry["file"]} escapes the member directory'
+            )
         for command in entry["commands"]:
-            if not isinstance(command, dict) or not isinstance(command.get("name"), str) or not command["name"]:
+            if (
+                not isinstance(command, dict)
+                or not isinstance(command.get("name"), str)
+                or not command["name"]
+            ):
                 raise ExtensionCommandError(
-                    hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: each command " 'needs a non-empty string "name"'
+                    hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: each command "
+                    'needs a non-empty string "name"'
                 )
             name = command["name"]
             attr = command.get("class", name)
             if not isinstance(attr, str) or not attr:
                 raise ExtensionCommandError(
-                    hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: command " f'"{name}": "class" is not a non-empty string'
+                    hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: command "
+                    f'"{name}": "class" is not a non-empty string'
                 )
             help_text = command.get(
                 "help",
@@ -588,7 +595,8 @@ def _specs_from_file(member, root: str, spec_file: str):
             )
             if not isinstance(help_text, str):
                 raise ExtensionCommandError(
-                    hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: command " f'"{name}": "help" is not a string'
+                    hint=f"{spec_file}: {_EXT_SCHEMA_ERROR}: command "
+                    f'"{name}": "help" is not a string'
                 )
             specs.append(
                 ExtCommandSpec(

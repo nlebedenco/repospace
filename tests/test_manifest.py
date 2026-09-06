@@ -116,8 +116,7 @@ def test_null_default_revision_rejected():
 
 
 def test_integer_revision_rejected():
-    # Revisions are strings, never numbers; unquoted numerics are a
-    # missing quote.
+    # Revisions are strings, never numbers; unquoted numerics are a missing quote.
     with pytest.raises(MalformedManifest) as excinfo:
         load("""
             manifest:
@@ -137,8 +136,8 @@ def test_integer_revision_rejected():
     ],
 )
 def test_leading_dash_revision_rejected(text):
-    # Git refnames cannot begin with "-", and such a value would be
-    # read as an option by the git commands that take a revision.
+    # Git refnames cannot begin with "-", and such a value would be read as an option by the git
+    # commands that take a revision.
     with pytest.raises(MalformedManifest) as excinfo:
         Manifest.from_data(text)
     assert 'begins with "-"' in str(excinfo.value)
@@ -167,9 +166,8 @@ def member_with_revision(revision):
     ],
 )
 def test_refspec_and_operator_syntax_in_revision_rejected(revision, fragment):
-    # A revision reaches git as a fetch refspec and as a revision
-    # argument: "main:refs/heads/work" would move the member's local
-    # "work" branch to the remote's main, "*" fetches a pattern, "^"
+    # A revision reaches git as a fetch refspec and as a revision argument: "main:refs/heads/work"
+    # would move the member's local "work" branch to the remote's main, "*" fetches a pattern, "^"
     # and "~" are revision operators. Only refname-safe strings pass.
     with pytest.raises(MalformedManifest) as excinfo:
         Manifest.from_data(member_with_revision(revision))
@@ -178,7 +176,17 @@ def test_refspec_and_operator_syntax_in_revision_rejected(revision, fragment):
 
 @pytest.mark.parametrize(
     "revision",
-    ["main", "refs/heads/main", "v1.0", "feature/x-y_z", "0123abcd", "HEAD", "release/2024.01", "a+b", "x@y"],
+    [
+        "main",
+        "refs/heads/main",
+        "v1.0",
+        "feature/x-y_z",
+        "0123abcd",
+        "HEAD",
+        "release/2024.01",
+        "a+b",
+        "x@y",
+    ],
 )
 def test_refname_safe_revisions_accepted(revision):
     manifest = Manifest.from_data(member_with_revision(revision))
@@ -281,8 +289,8 @@ _MEMBER_HEAD = "manifest:\n  members:\n    - name: a\n      url: u\n"
     ],
 )
 def test_explicit_null_keys_rejected(text, fragment):
-    # Explicit null is invalid everywhere except "manifest" itself and
-    # "userdata"; the key belongs removed instead.
+    # Explicit null is invalid everywhere except "manifest" itself and "userdata"; the key belongs
+    # removed instead.
     with pytest.raises(MalformedManifest) as excinfo:
         Manifest.from_data(text)
     assert fragment in str(excinfo.value)
@@ -306,8 +314,8 @@ def test_dotdot_prefixed_path_component_allowed():
 
 
 def test_member_path_is_normalized():
-    # The stored path is what as_dict() re-emits and what the placement
-    # checks run on; "libs/x/../y" is the directory "libs/y".
+    # The stored path is what as_dict() re-emits and what the placement checks run on; "libs/x/../y"
+    # is the directory "libs/y".
     manifest = load("""
         manifest:
           members:
@@ -447,9 +455,8 @@ def test_new_attributes():
     assert manifest.yaml_name == "app"
 
 
-# The parameters are YAML scalars, quoted here rather than through
-# repr(), so that '"a\\b"' reaches the parser as a name holding one
-# backslash instead of a literal backslash-b.
+# The parameters are YAML scalars, quoted here rather than through repr(), so that '"a\\b"' reaches
+# the parser as a name holding one backslash instead of a literal backslash-b.
 @pytest.mark.parametrize("name", ["''", "'.'", "'..'", "a/b", '"a\\\\b"', ".repospace"])
 def test_self_invalid_name_rejected(name):
     with pytest.raises(MalformedManifest):
@@ -492,8 +499,8 @@ def test_versions(text, exc):
 
 
 def test_version_checked_before_structure():
-    # A newer manifest may be structurally incompatible; the version
-    # error must win over the unknown-key error.
+    # A newer manifest may be structurally incompatible; the version error must win over the
+    # unknown-key error.
     with pytest.raises(ManifestVersionError):
         load("""
             manifest:
@@ -503,8 +510,8 @@ def test_version_checked_before_structure():
 
 
 def test_null_version_rejected():
-    # An explicit null is an editing artifact like everywhere else; the
-    # quoting hint for an unquotable value would be wrong advice.
+    # An explicit null is an editing artifact like everywhere else; the quoting hint for an
+    # unquotable value would be wrong advice.
     with pytest.raises(MalformedManifest) as excinfo:
         Manifest.from_data("manifest:\n  version:\n")
     assert '"version" has no value; remove the key' in str(excinfo.value)
@@ -512,8 +519,8 @@ def test_null_version_rejected():
 
 
 def test_unknown_non_string_keys_reported():
-    # YAML resolves a bare "on:" key to the boolean True, which does not
-    # sort against string keys; the key list must still be reportable.
+    # YAML resolves a bare "on:" key to the boolean True, which does not sort against string keys;
+    # the key list must still be reportable.
     with pytest.raises(MalformedManifest) as excinfo:
         validate("manifest:\n  on: 1\n  bogus: 2\n")
     message = str(excinfo.value)
@@ -544,9 +551,8 @@ def test_structural_errors(text):
 
 @pytest.mark.parametrize("name", ["", ".", "..", ".git", ".repospace", ".hidden", "a/b"])
 def test_invalid_self_names(name):
-    # A suggested clone-directory name only: no paths, and no hidden or
-    # git-confusing directories (".git", ".repospace") in the caller's
-    # filesystem.
+    # A suggested clone-directory name only: no paths, and no hidden or git-confusing directories
+    # (".git", ".repospace") in the caller's filesystem.
     with pytest.raises(MalformedManifest) as excinfo:
         validate(f"manifest:\n  self:\n    name: {name!r}\n")
     assert "path component" in str(excinfo.value)
@@ -562,13 +568,13 @@ def test_valid_self_names(name):
     validate(f"manifest:\n  self:\n    name: {name!r}\n")
 
 
-# YAML scalars, quoted here rather than through repr(): repr() of a
-# name holding a newline yields a single-quoted scalar, in which YAML
-# reads "\n" as a literal backslash-n and the newline is never tested.
+# YAML scalars, quoted here rather than through repr(): repr() of a name holding a newline yields a
+# single-quoted scalar, in which YAML reads "\n" as a literal backslash-n and the newline is never
+# tested.
 @pytest.mark.parametrize("name", ["'P\"kg'", "'P;kg'", "'Pk g'", '"P\\nkg"', "'-Pkg'"])
 def test_invalid_cmake_package_names(name):
-    # Package names are interpolated into generated CMake code and are
-    # restricted to characters that cannot break or extend it.
+    # Package names are interpolated into generated CMake code and are restricted to characters that
+    # cannot break or extend it.
     for text in (
         f"manifest:\n  members:\n    - name: a\n      url: u\n" f"      cmake-packages: [{name}]\n",
         f"manifest:\n  self:\n    cmake-packages: [{name}]\n",
@@ -593,9 +599,8 @@ def test_group_filter_validation():
 
 
 def test_group_filter_numeric_item_hints_quoting():
-    # YAML eats the sign of an unquoted -1; the error must suggest
-    # quoting instead of just demanding a "+" or "-" the user already
-    # typed.
+    # YAML eats the sign of an unquoted -1; the error must suggest quoting instead of just demanding
+    # a "+" or "-" the user already typed.
     with pytest.raises(MalformedManifest) as excinfo:
         load("manifest:\n  group-filter: [-1]\n")
     assert "quote" in str(excinfo.value)
@@ -633,8 +638,7 @@ def test_is_active():
 
 @pytest.mark.parametrize("entry", ["", "optional"])
 def test_is_active_rejects_invalid_extra_filter(entry):
-    # A filter entry must say which way it goes; an empty one used to
-    # index out of range.
+    # A filter entry must say which way it goes; an empty one used to index out of range.
     manifest = load("""
         manifest:
           members:
@@ -763,9 +767,8 @@ def test_path_into_repospace_dir_via_symlink_rejected(tmp_path):
 
 
 def test_member_directory_symlink_rejected(tmp_path):
-    # Symlinks are valid only above the repospace directory: a member's
-    # own directory being a link would let a link committed in the
-    # manifest repository send the checkout anywhere.
+    # Symlinks are valid only above the repospace directory: a member's own directory being a link
+    # would let a link committed in the manifest repository send the checkout anywhere.
     outside = tmp_path / "outside"
     outside.mkdir()
     top = tmp_path / "ws"
@@ -786,8 +789,8 @@ def test_member_directory_symlink_rejected(tmp_path):
 
 
 def test_member_path_components_may_not_exist(tmp_path):
-    # Nothing is cloned yet: components that do not exist are created
-    # as directories by "update", so they are not symlinks.
+    # Nothing is cloned yet: components that do not exist are created as directories by "update", so
+    # they are not symlinks.
     top = tmp_path / "ws"
     top.mkdir()
     manifest = load(
@@ -804,8 +807,8 @@ def test_member_path_components_may_not_exist(tmp_path):
 
 
 def test_symlink_above_topdir_allowed(tmp_path):
-    # The repospace itself may be reached through a symlink; that
-    # placement is the user's own doing, not manifest data's.
+    # The repospace itself may be reached through a symlink; that placement is the user's own doing,
+    # not manifest data's.
     real = tmp_path / "real"
     (real / "m").mkdir(parents=True)
     top = tmp_path / "ws"
@@ -824,7 +827,9 @@ def test_symlink_above_topdir_allowed(tmp_path):
 
 def test_from_file_and_from_topdir(tmp_path):
     (tmp_path / ".repospace").mkdir()
-    (tmp_path / "repospace.yaml").write_text("manifest:\n  members:\n    - name: lib\n      url: u\n")
+    (tmp_path / "repospace.yaml").write_text(
+        "manifest:\n  members:\n    - name: lib\n      url: u\n"
+    )
 
     by_file = Manifest.from_file(tmp_path / "repospace.yaml")
     assert by_file.topdir == str(tmp_path)
@@ -838,15 +843,14 @@ def test_from_file_and_from_topdir(tmp_path):
 
 
 def test_from_file_in_subdirectory_anchors_at_topdir(tmp_path):
-    # manifest.file may live in a subdirectory; the manifest repository
-    # is still the topdir, so the manifest member's path is "." (as in
-    # from_topdir) and a member path equal to the subdirectory name is
-    # not a path collision.
+    # manifest.file may live in a subdirectory; the manifest repository is still the topdir, so the
+    # manifest member's path is "." (as in from_topdir) and a member path equal to the subdirectory
+    # name is not a path collision.
     (tmp_path / ".repospace").mkdir()
     sub = tmp_path / "manifests"
     sub.mkdir()
     (sub / "m.yaml").write_text(
-        "manifest:\n" "  members:\n" "    - name: lib\n" "      url: u\n" "      path: manifests\n"
+        "manifest:\n  members:\n    - name: lib\n      url: u\n      path: manifests\n"
     )
     manifest = Manifest.from_file(sub / "m.yaml")
     assert manifest.topdir == str(tmp_path)
@@ -863,8 +867,8 @@ def test_from_file_in_subdirectory_anchors_at_topdir(tmp_path):
     ],
 )
 def test_from_file_read_errors_raise_malformed(tmp_path, make, fragment):
-    # from_file wraps read failures like from_topdir: a missing file or
-    # a directory must not escape as a raw OSError.
+    # from_file wraps read failures like from_topdir: a missing file or a directory must not escape
+    # as a raw OSError.
     with pytest.raises(MalformedManifest) as excinfo:
         Manifest.from_file(make(tmp_path))
     assert fragment in str(excinfo.value)

@@ -32,8 +32,8 @@ def git_executable() -> str:
 def git_version() -> Tuple[int, ...]:
     """Return git's version as a tuple of ints, usually 3 elements.
 
-    Tolerates vendor suffixes such as "2.28.0.windows.1",
-    "2.24.3 (Apple Git-128)", and truncated forms like "2.29.GIT".
+    Tolerates vendor suffixes such as "2.28.0.windows.1", "2.24.3 (Apple Git-128)", and truncated
+    forms like "2.29.GIT".
     """
     global _git_version
     if _git_version is None:

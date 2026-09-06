@@ -20,15 +20,15 @@ def main():
     src = args.msg_filename + ".orig"
     dst = args.msg_filename
     if os.path.exists(src):
-        # Only restore when git prepared the message file itself with no real user-supplied
-        # content (no source, or the configured commit.template). If the user gave an explicit
-        # message (-m/-F), is reusing a specific commit (-c/-C/--amend), or this is a
-        # merge/squash message, that content must take precedence over the stale backup.
+        # Only restore when git prepared the message file itself with no real user-supplied content
+        # (no source, or the configured commit.template). If the user gave an explicit message
+        # (-m/-F), is reusing a specific commit (-c/-C/--amend), or this is a merge/squash message,
+        # that content must take precedence over the stale backup.
         if source in (None, "template"):
             shutil.move(src, dst)
         else:
-            # The backup doesn't apply to this attempt; discard it so it doesn't wrongly
-            # resurface and overwrite an unrelated, later editor-based commit message.
+            # The backup doesn't apply to this attempt; discard it so it doesn't wrongly resurface
+            # and overwrite an unrelated, later editor-based commit message.
             os.remove(src)
 
 

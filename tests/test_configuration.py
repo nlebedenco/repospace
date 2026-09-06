@@ -38,9 +38,8 @@ def test_parse_key():
     for bad in ("nodot", ".key", "section.", "."):
         with pytest.raises(ValueError):
             parse_key(bad)
-    # INI-significant characters in a name would be reinterpreted on
-    # the next read of the file (as a different option, a comment, or
-    # an injected line), so they are rejected before anything is
+    # INI-significant characters in a name would be reinterpreted on the next read of the file (as a
+    # different option, a comment, or an injected line), so they are rejected before anything is
     # written.
     for bad in (
         "alias.x=y",
@@ -77,9 +76,8 @@ def test_malformed_file_raises(repospace):
 
 
 def test_continuation_line_under_valueless_key_raises(repospace):
-    # configparser fails on this with an AttributeError of its own
-    # rather than a parsing error; it must still surface as
-    # MalformedConfig, not as a traceback out of every invocation.
+    # configparser fails on this with an AttributeError of its own rather than a parsing error; it
+    # must still surface as MalformedConfig, not as a traceback out of every invocation.
     write_ini(repospace / ".repospace" / "config", "[a]\nb\n  c\n")
     with pytest.raises(MalformedConfig) as excinfo:
         Configuration(topdir=str(repospace))
@@ -87,9 +85,8 @@ def test_continuation_line_under_valueless_key_raises(repospace):
 
 
 def test_unreadable_file_raises(repospace):
-    # configparser.read() would silently skip a file it cannot open; a
-    # configuration the user believes is in effect must not be dropped
-    # without a diagnostic.
+    # configparser.read() would silently skip a file it cannot open; a configuration the user
+    # believes is in effect must not be dropped without a diagnostic.
     path = repospace / ".repospace" / "config"
     write_ini(path, "[a]\nb = 1\n")
     path.chmod(0)
@@ -156,8 +153,8 @@ def test_set_second_key_in_section(repospace):
 
 
 def test_set_default_section_rejected(repospace):
-    # DEFAULT is reserved by configparser; a clean error, no traceback.
-    # Reserved in any case, since section names are lowercased.
+    # DEFAULT is reserved by configparser; a clean error, no traceback. Reserved in any case, since
+    # section names are lowercased.
     config = Configuration(topdir=str(repospace))
     for option in ("DEFAULT.key", "default.key", "Default.key"):
         with pytest.raises(MalformedConfig):
@@ -269,8 +266,8 @@ def test_delete_last_key_removes_section(repospace):
 
 
 def test_percent_in_value_is_literal(repospace):
-    # "%" must not trigger configparser interpolation (git format
-    # strings in aliases, URL-encoded strings, ...).
+    # "%" must not trigger configparser interpolation (git format strings in aliases, URL-encoded
+    # strings, ...).
     config = Configuration(topdir=str(repospace))
     config.set("alias.lg", "log --format=%h")
     fresh = Configuration(topdir=str(repospace))
@@ -288,8 +285,8 @@ def test_items_merged(tmp_path, monkeypatch, repospace):
 
 
 def test_option_names_case_insensitive(repospace):
-    # Setting "Alias.UP" must address the same option every read
-    # consults, not a dead "[Alias]" section.
+    # Setting "Alias.UP" must address the same option every read consults, not a dead "[Alias]"
+    # section.
     config = Configuration(topdir=str(repospace))
     config.set("Alias.UP", "update")
     fresh = Configuration(topdir=str(repospace))
@@ -299,8 +296,8 @@ def test_option_names_case_insensitive(repospace):
 
 
 def test_sections_differing_by_case_merge_on_read(repospace):
-    # Hand-written files: like git config, "[Alias]" and "[alias]" are
-    # the same section, with the later definition winning on conflict.
+    # Hand-written files: like git config, "[Alias]" and "[alias]" are the same section, with the
+    # later definition winning on conflict.
     write_ini(
         repospace / ".repospace" / "config",
         "[Alias]\nUP = one\nonly = here\n[alias]\nup = two\n",
@@ -312,9 +309,8 @@ def test_sections_differing_by_case_merge_on_read(repospace):
 
 
 def test_write_failure_raises_malformed_config(tmp_path, monkeypatch):
-    # A failing write (here: the parent "directory" is a file) must
-    # surface as MalformedConfig, like a failing read, not as a raw
-    # OSError traceback.
+    # A failing write (here: the parent "directory" is a file) must surface as MalformedConfig, like
+    # a failing read, not as a raw OSError traceback.
     blocker = tmp_path / "blocker"
     blocker.write_text("")
     monkeypatch.setenv("REPOSPACE_CONFIG_LOCAL", str(blocker / "config"))
@@ -328,7 +324,13 @@ def test_set_preserves_comments_and_layout(repospace):
     path = repospace / ".repospace" / "config"
     write_ini(
         path,
-        "# how to fetch\n" "[update]\n" "; a note\n" "fetch = always\n" "\n" "[color]\n" "ui = true\n",
+        "# how to fetch\n"
+        "[update]\n"
+        "; a note\n"
+        "fetch = always\n"
+        "\n"
+        "[color]\n"
+        "ui = true\n",
     )
     config = Configuration(topdir=str(repospace))
     config.set("update.fetch", "smart")
@@ -374,8 +376,8 @@ def test_delete_preserves_comments(repospace):
 
 
 def test_delete_last_key_keeps_section_with_comments(repospace):
-    # Removing an all-blank section is tidy; removing one that still
-    # holds comments would delete the user's notes with it.
+    # Removing an all-blank section is tidy; removing one that still holds comments would delete the
+    # user's notes with it.
     path = repospace / ".repospace" / "config"
     write_ini(path, "[solo]\n# keep me\nkey = 1\n")
     config = Configuration(topdir=str(repospace))
@@ -408,8 +410,8 @@ def test_set_multiline_value_round_trips(repospace):
 
 
 def test_set_matches_section_case_insensitively(repospace):
-    # The file's "[Alias]" and the option's "alias" are the same
-    # section; the edit must land there, not append a duplicate.
+    # The file's "[Alias]" and the option's "alias" are the same section; the edit must land there,
+    # not append a duplicate.
     path = repospace / ".repospace" / "config"
     write_ini(path, "[Alias]\n# mine\nup = update\n")
     config = Configuration(topdir=str(repospace))
@@ -432,9 +434,8 @@ def test_set_replaces_valueless_key(repospace):
 
 
 def test_default_section_rejected_on_read(repospace):
-    # A [DEFAULT] section would leak its keys into every section on
-    # read, and the next write would then duplicate them into each
-    # section. Reserved in any case, matching what set() enforces.
+    # A [DEFAULT] section would leak its keys into every section on read, and the next write would
+    # then duplicate them into each section. Reserved in any case, matching what set() enforces.
     for section in ("DEFAULT", "default", "Default"):
         write_ini(
             repospace / ".repospace" / "config",
@@ -455,8 +456,8 @@ def test_default_section_rejected_on_read(repospace):
     ],
 )
 def test_set_stores_the_value_the_reader_gives_back(repospace, raw, stored):
-    # configparser strips each line and drops trailing blank lines on
-    # read; get() must answer the same in this process and the next.
+    # configparser strips each line and drops trailing blank lines on read; get() must answer the
+    # same in this process and the next.
     config = Configuration(topdir=str(repospace))
     config.set("alias.x", raw)
     assert config.get("alias.x") == stored
@@ -464,9 +465,8 @@ def test_set_stores_the_value_the_reader_gives_back(repospace, raw, stored):
 
 
 def test_set_rejects_carriage_return_in_value(repospace):
-    # Universal-newline reading turns a written "\r" into a line break,
-    # which would truncate the value and inject the rest as options of
-    # its own; the value is refused instead.
+    # Universal-newline reading turns a written "\r" into a line break, which would truncate the
+    # value and inject the rest as options of its own; the value is refused instead.
     path = repospace / ".repospace" / "config"
     write_ini(path, "[sec]\nopt = safe\n")
     config = Configuration(topdir=str(repospace))
@@ -479,8 +479,8 @@ def test_set_rejects_carriage_return_in_value(repospace):
 
 
 def test_set_rejects_comment_continuation_line(repospace):
-    # An indented "#" or ";" line is a comment to configparser, so such
-    # a value would silently read back short.
+    # An indented "#" or ";" line is a comment to configparser, so such a value would silently read
+    # back short.
     config = Configuration(topdir=str(repospace))
     for value in ("one\n#two", "one\n;two", "one\n  # two"):
         with pytest.raises(MalformedConfig) as excinfo:
@@ -490,9 +490,8 @@ def test_set_rejects_comment_continuation_line(repospace):
 
 
 def test_unrelated_set_preserves_line_boundary_characters(repospace):
-    # str.splitlines() breaks on boundaries the file format does not
-    # have; rewriting them as newlines would corrupt values the edit
-    # never touched.
+    # str.splitlines() breaks on boundaries the file format does not have; rewriting them as
+    # newlines would corrupt values the edit never touched.
     path = repospace / ".repospace" / "config"
     exotic = "one\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029two"
     path.write_text(f"[a]\nb = {exotic}\nc = 3\n", encoding="utf-8")
@@ -505,8 +504,8 @@ def test_unrelated_set_preserves_line_boundary_characters(repospace):
 
 
 def test_failed_write_leaves_the_file_intact(repospace, monkeypatch):
-    # The replacement is computed first and swapped in whole: a failure
-    # part-way must not leave an empty configuration file behind.
+    # The replacement is computed first and swapped in whole: a failure part-way must not leave an
+    # empty configuration file behind.
     path = repospace / ".repospace" / "config"
     write_ini(path, "[a]\nb = 1\n")
     config = Configuration(topdir=str(repospace))
@@ -523,8 +522,8 @@ def test_failed_write_leaves_the_file_intact(repospace, monkeypatch):
 def test_set_preserves_file_mode_and_leaves_no_temp_file(repospace):
     path = repospace / ".repospace" / "config"
     write_ini(path, "[a]\nb = 1\n")
-    # Not 0600: that is what mkstemp() creates the temporary file with,
-    # so it would not show a mode the swap failed to carry over.
+    # Not 0600: that is what mkstemp() creates the temporary file with, so it would not show a mode
+    # the swap failed to carry over.
     path.chmod(0o640)
     config = Configuration(topdir=str(repospace))
     config.set("a.b", "2")
@@ -533,9 +532,8 @@ def test_set_preserves_file_mode_and_leaves_no_temp_file(repospace):
 
 
 def test_set_agrees_with_the_reader_on_bracketed_section_names(repospace):
-    # configparser reads "[a]x]" as the section "a]x". A writer that
-    # stopped at the first "]" would overwrite that section's option
-    # and write a value no read can find.
+    # configparser reads "[a]x]" as the section "a]x". A writer that stopped at the first "]" would
+    # overwrite that section's option and write a value no read can find.
     path = repospace / ".repospace" / "config"
     write_ini(path, "[a]x]\nkey = other\n")
     config = Configuration(topdir=str(repospace))

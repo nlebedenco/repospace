@@ -1,7 +1,7 @@
 """Manifest parsing, validation, and import resolution.
 
-A repospace manifest is a YAML file (conventionally ``repospace.yaml``) with
-a single top-level ``manifest`` key containing these sections, all optional:
+A repospace manifest is a YAML file (conventionally ``repospace.yaml``) with a single top-level
+``manifest`` key containing these sections, all optional:
 
   version:       minimum schema version required to parse the file
   defaults:      default member remote and revision (this file only)
@@ -10,14 +10,13 @@ a single top-level ``manifest`` key containing these sections, all optional:
   self:          attributes of the manifest repository itself
   group-filter:  groups disabled or enabled by default
 
-Manifests may import other manifests, either from the manifest repository
-itself (``self: import:``, read from the filesystem) or from members
-(``members: - import:``, read from git at ``refs/heads/repospace-rev``).
-A ``self: import:`` inside a manifest that itself came from a member is
-read from that member's git data too, never from its working tree.
-Resolution precedence: self-imports first, then this file's members, then
-member imports in declaration order. The first definition of a member name
-wins; later definitions are ignored and their imports are never processed.
+Manifests may import other manifests, either from the manifest repository itself (``self: import:``,
+read from the filesystem) or from members (``members: - import:``, read from git at
+``refs/heads/repospace-rev``). A ``self: import:`` inside a manifest that itself came from a member
+is read from that member's git data too, never from its working tree. Resolution precedence:
+self-imports first, then this file's members, then member imports in declaration order. The first
+definition of a member name wins; later definitions are ignored and their imports are never
+processed.
 """
 
 from __future__ import annotations
@@ -41,9 +40,8 @@ from repospace.git import run_git
 
 _logger = logging.getLogger(__name__)
 
-#: The default manifest file name. The top-level entry point can be
-#: changed with the manifest.file configuration option (written by
-#: "init --manifest"); imports name other files explicitly.
+#: The default manifest file name. The top-level entry point can be changed with the manifest.file
+#: configuration option (written by "init --manifest"); imports name other files explicitly.
 MANIFEST_FILE = "repospace.yaml"
 
 #: Highest manifest schema version this repospace understands.
@@ -51,8 +49,8 @@ SCHEMA_VERSION = "1.0"
 
 _VALID_SCHEMA_VERSIONS = (SCHEMA_VERSION,)
 
-#: Local branch owned by repospace, pointing at each member's manifest
-#: revision as of the last update.
+#: Local branch owned by repospace, pointing at each member's manifest revision as of the last
+#: update.
 MANIFEST_REV = "repospace-rev"
 
 #: Fully qualified name of MANIFEST_REV.
@@ -68,8 +66,8 @@ _DEFAULT_REVISION = "main"
 _MAX_IMPORT_DEPTH = 50
 _ENCODING = "utf-8"
 
-#: git file mode of a symbolic link; git stores one as a blob holding
-#: the link target, so the object type alone does not identify it.
+#: git file mode of a symbolic link; git stores one as a blob holding the link target, so the object
+#: type alone does not identify it.
 _SYMLINK_MODE = "120000"
 
 
@@ -110,16 +108,16 @@ class ImportFlag(enum.IntFlag):
     DEFAULT = 0
     #: Ignore all imports.
     IGNORE = 1
-    #: Always obtain member import data through the importer callback,
-    #: never by reading a member's local git objects directly.
+    #: Always obtain member import data through the importer callback, never by reading a member's
+    #: local git objects directly.
     FORCE_MEMBERS = 2
     #: Resolve self-imports only; ignore member imports.
     IGNORE_MEMBERS = 4
 
 
-#: An importer callback receives the Member whose import is being resolved
-#: and the requested path within it. It returns the manifest content as a
-#: string (or list of strings, for a directory), or None to skip the import.
+#: An importer callback receives the Member whose import is being resolved and the requested path
+#: within it. It returns the manifest content as a string (or list of strings, for a directory), or
+#: None to skip the import.
 ImporterType = Callable[["Member", str], Optional[Union[str, List[str]]]]
 
 
@@ -132,8 +130,8 @@ class Submodule:
 def is_group(value: Any) -> bool:
     """Return True if *value* is a valid group name.
 
-    Group names are strings, never numbers: YAML would otherwise mangle
-    unquoted numeric names (1.10 parses as the float 1.1).
+    Group names are strings, never numbers: YAML would otherwise mangle unquoted numeric names (1.10
+    parses as the float 1.1).
     """
     if not isinstance(value, str) or not value:
         return False
@@ -188,8 +186,8 @@ class Member:
         self.extension_commands = _str_list(extension_commands)
         self.cmake_packages = _str_list(cmake_packages)
         self.topdir = topdir
-        # Always "origin", however the URL was declared: manifest remote
-        # names are URL-prefix identifiers, not git remote names.
+        # Always "origin", however the URL was declared: manifest remote names are URL-prefix
+        # identifiers, not git remote names.
         self.remote_name = "origin"
         self.groups = list(groups or [])
         self.userdata = userdata
@@ -250,9 +248,8 @@ class Member:
     def sha(self, rev: str = QUAL_MANIFEST_REV, capture_stderr: bool = False) -> str:
         """Return the commit SHA *rev* peels to.
 
-        Callers that catch the CalledProcessError and treat a missing
-        revision as a normal outcome should pass capture_stderr=True,
-        or git's "fatal: ..." message leaks to the terminal.
+        Callers that catch the CalledProcessError and treat a missing revision as a normal outcome
+        should pass capture_stderr=True, or git's "fatal: ..." message leaks to the terminal.
         """
         result = self.git(
             ["rev-parse", f"{rev}^{{commit}}"],
@@ -291,7 +288,10 @@ class Member:
             if isinstance(self.submodules, bool):
                 data["submodules"] = True
             else:
-                data["submodules"] = [{"path": s.path, **({"name": s.name} if s.name else {})} for s in self.submodules]
+                data["submodules"] = [
+                    {"path": s.path, **({"name": s.name} if s.name else {})}
+                    for s in self.submodules
+                ]
         if self.userdata is not None:
             data["userdata"] = self.userdata
         return data
@@ -323,14 +323,14 @@ class ManifestMember(Member):
             cmake_packages=cmake_packages,
             userdata=userdata,
         )
-        # The manifest repository has no managed revision, and its path
-        # may legitimately be unknown (no topdir).
+        # The manifest repository has no managed revision, and its path may legitimately be unknown
+        # (no topdir).
         self.revision = None
         self.path = path
 
     def as_dict(self) -> dict:
-        # The manifest repository is the repospace root itself; there is
-        # no location to record in manifest data.
+        # The manifest repository is the repospace root itself; there is no location to record in
+        # manifest data.
         data: Dict[str, Any] = {}
         if self.extension_commands:
             data["extension-commands"] = _shrink(self.extension_commands)
@@ -379,9 +379,8 @@ _IMPORT_MAP_KEYS = frozenset(
 )
 
 
-#: CMake package names are interpolated into generated CMake code
-#: (packages.cmake), where arbitrary characters could break the file or
-#: inject commands; restrict them to a safe set.
+#: CMake package names are interpolated into generated CMake code (packages.cmake), where arbitrary
+#: characters could break the file or inject commands; restrict them to a safe set.
 _CMAKE_PACKAGE_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.+-]*\Z")
 
 
@@ -395,9 +394,8 @@ def _version_tuple(version: str) -> Tuple[int, ...]:
 def _check_version(mdata: dict, where: str) -> None:
     if "version" not in mdata:
         return
-    # Checked here rather than with the other keys: the version is
-    # checked before anything else, and str(None) would otherwise be
-    # reported as the invalid version "None" with a quoting hint that
+    # Checked here rather than with the other keys: the version is checked before anything else, and
+    # str(None) would otherwise be reported as the invalid version "None" with a quoting hint that
     # cannot help.
     _check_null_keys(mdata, ("version",), where)
     raw = mdata["version"]
@@ -406,8 +404,7 @@ def _check_version(mdata: dict, where: str) -> None:
         return
     parsed = _version_tuple(version)
     supported = _version_tuple(SCHEMA_VERSION)
-    # Compare zero-padded so "1.0.0" and "1" mean schema 1.0, not a
-    # newer or invalid version.
+    # Compare zero-padded so "1.0.0" and "1" mean schema 1.0, not a newer or invalid version.
     width = max(len(parsed), len(supported))
     padded = parsed + (0,) * (width - len(parsed))
     if parsed:
@@ -427,10 +424,9 @@ def _expect(condition: bool, message: str) -> None:
 def _key_list(keys) -> List[str]:
     """Render *keys* as a sorted list of strings.
 
-    Manifest keys are not all strings: YAML resolves a bare "on:" or
-    "no:" to a bool and a bare date to datetime.date, and such keys do
-    not sort against strings. Sorting their string form keeps a key set
-    reportable whatever the file contains.
+    Manifest keys are not all strings: YAML resolves a bare "on:" or "no:" to a bool and a bare date
+    to datetime.date, and such keys do not sort against strings. Sorting their string form keeps a
+    key set reportable whatever the file contains.
     """
     return sorted(str(key) for key in keys)
 
@@ -443,9 +439,9 @@ def _check_keys(mapping: dict, allowed: frozenset, where: str) -> None:
 def _check_null_keys(mapping: dict, keys, where: str, hints: Optional[dict] = None) -> None:
     """Reject keys present with an explicit null value.
 
-    Explicit null is invalid for every key except "manifest" itself and
-    "userdata": the schema types everything else non-null, and a null
-    key is an editing artifact — the key belongs removed instead.
+    Explicit null is invalid for every key except "manifest" itself and "userdata": the schema types
+    everything else non-null, and a null key is an editing artifact — the key belongs removed
+    instead.
     """
     for key in keys:
         if key in mapping and mapping[key] is None:
@@ -454,7 +450,9 @@ def _check_null_keys(mapping: dict, keys, where: str, hints: Optional[dict] = No
 
 
 def _is_str_or_str_list(value: Any) -> bool:
-    return isinstance(value, str) or (isinstance(value, list) and all(isinstance(v, str) for v in value))
+    return isinstance(value, str) or (
+        isinstance(value, list) and all(isinstance(v, str) for v in value)
+    )
 
 
 def _check_cmake_packages(value: Any, where: str) -> None:
@@ -474,14 +472,11 @@ def _check_cmake_packages(value: Any, where: str) -> None:
 def _refname_defect(value: str) -> Optional[str]:
     """Say what keeps *value* from being a git refname, or return None.
 
-    These are git-check-ref-format's character rules. A revision
-    reaches git as a fetch refspec and as a revision argument, and
-    every refused character has syntax of its own there: ":" separates
-    a refspec's source from its destination (a manifest could then
-    move any local branch of the member), "*" makes it a pattern, "^",
-    "~", ".." and "@{" are revision operators, "?", "[" and "\\" are
-    glob syntax, and whitespace or control characters split or hide
-    the argument.
+    These are git-check-ref-format's character rules. A revision reaches git as a fetch refspec and
+    as a revision argument, and every refused character has syntax of its own there: ":" separates a
+    refspec's source from its destination (a manifest could then move any local branch of the
+    member), "*" makes it a pattern, "^", "~", ".." and "@{" are revision operators, "?", "[" and
+    "\\" are glob syntax, and whitespace or control characters split or hide the argument.
     """
     for char in value:
         if char in " ~^:?*[\\" or ord(char) < 0x20 or ord(char) == 0x7F:
@@ -495,19 +490,18 @@ def _refname_defect(value: str) -> Optional[str]:
 
 
 def _check_revision(value: Any, where: str) -> None:
-    # Revisions are strings, never numbers: YAML mangles unquoted
-    # numeric revisions (1.10 becomes the float 1.1, 0700 an octal
-    # int), and a stray number is almost always a missing quote.
+    # Revisions are strings, never numbers: YAML mangles unquoted numeric revisions (1.10 becomes
+    # the float 1.1, 0700 an octal int), and a stray number is almost always a missing quote.
     if isinstance(value, str):
         if value.startswith("-"):
-            # Git refnames cannot begin with "-", and such a value would
-            # be read as a command-line option by the git commands that
-            # take a revision.
-            raise MalformedManifest(f'{where}: revision "{value}" begins with "-"; this is ' "not a valid git revision")
+            # Git refnames cannot begin with "-", and such a value would be read as a command-line
+            # option by the git commands that take a revision.
+            raise MalformedManifest(
+                f'{where}: revision "{value}" begins with "-"; this is not a valid git revision'
+            )
         if value.startswith("+"):
-            # A refname may begin with "+", but a refspec beginning with
-            # "+" is a forced one for the name that follows it, so
-            # "update" would fetch a different branch than the one named.
+            # A refname may begin with "+", but a refspec beginning with "+" is a forced one for the
+            # name that follows it, so "update" would fetch a different branch than the one named.
             raise MalformedManifest(
                 f'{where}: revision "{value}" begins with "+", which marks a forced refspec '
                 f"when it is fetched; name the branch as refs/heads/{value} instead"
@@ -516,19 +510,24 @@ def _check_revision(value: Any, where: str) -> None:
             raise MalformedManifest(f"{where}: revision is empty; remove the key or set one")
         defect = _refname_defect(value)
         if defect is not None:
-            raise MalformedManifest(f'{where}: revision "{value}" {defect}; this is not a valid git revision')
+            raise MalformedManifest(
+                f'{where}: revision "{value}" {defect}; this is not a valid git revision'
+            )
         return
     if value is None:
         raise MalformedManifest(f"{where}: revision has no value; remove the key or set one")
-    raise MalformedManifest(f'{where}: revision "{value}" is not a string; ' "do you need to quote the value?")
+    raise MalformedManifest(
+        f'{where}: revision "{value}" is not a string; do you need to quote the value?'
+    )
 
 
-def _check_member_import(imp: Any, where: str, in_sequence: bool = False, _seen=frozenset()) -> None:
+def _check_member_import(
+    imp: Any, where: str, in_sequence: bool = False, _seen=frozenset()
+) -> None:
     """Check the shape of a member "import" value without resolving it.
 
-    Mirrors the cases _import_from_member handles, so that a load
-    that does not follow imports (ImportFlag.IGNORE, as "manifest
-    --validate" uses) still rejects what a real load would.
+    Mirrors the cases _import_from_member handles, so that a load that does not follow imports
+    (ImportFlag.IGNORE, as "manifest --validate" uses) still rejects what a real load would.
     """
     if isinstance(imp, bool):
         if in_sequence and not imp:
@@ -553,7 +552,9 @@ def _check_self_import(imp: Any, where: str, _seen=frozenset()) -> None:
         raise MalformedManifest(f'{where}: got "self: import: {imp}" of boolean')
     if isinstance(imp, str):
         if not imp:
-            raise MalformedManifest(f'{where}: "self: import" is empty; remove the key or set a value')
+            raise MalformedManifest(
+                f'{where}: "self: import" is empty; remove the key or set a value'
+            )
     elif isinstance(imp, list):
         if id(imp) in _seen:
             raise MalformedManifest(f'{where}: "self: import" contains a recursive YAML alias')
@@ -562,16 +563,17 @@ def _check_self_import(imp: Any, where: str, _seen=frozenset()) -> None:
     elif isinstance(imp, dict):
         _load_import_map(imp, where)
     else:
-        raise MalformedManifest(f'{where}: "self: import: {imp}" has invalid type {type(imp).__name__}')
+        raise MalformedManifest(
+            f'{where}: "self: import: {imp}" has invalid type {type(imp).__name__}'
+        )
 
 
 def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
     """Validate manifest data; return the value of the ``manifest`` key.
 
-    *source* is YAML text or already-parsed data. Raises MalformedManifest
-    or ManifestVersionError. The version is checked before anything else,
-    since future schemas may be structurally incompatible. Import values
-    are checked for shape here, not only when they are resolved, so a
+    *source* is YAML text or already-parsed data. Raises MalformedManifest or ManifestVersionError.
+    The version is checked before anything else, since future schemas may be structurally
+    incompatible. Import values are checked for shape here, not only when they are resolved, so a
     load with imports disabled rejects the same manifests a full load does.
     """
     if isinstance(source, str):
@@ -600,8 +602,8 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
     if defaults is not None:
         _expect(isinstance(defaults, dict), f"{where}: defaults is not a mapping")
         _check_keys(defaults, _DEFAULTS_KEYS, f"{where}: defaults")
-        # Presence checks, not .get(): an explicit null would otherwise
-        # be coerced downstream (str(None) is the revision "None").
+        # Presence checks, not .get(): an explicit null would otherwise be coerced downstream
+        # (str(None) is the revision "None").
         if "remote" in defaults:
             _expect(
                 isinstance(defaults["remote"], str) and defaults["remote"] != "",
@@ -623,11 +625,10 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
             for key in ("name", "url-base"):
                 _expect(
                     isinstance(remote.get(key), str) and remote[key] != "",
-                    f"{where}: remotes entry needs a non-empty string " f'"{key}"',
+                    f'{where}: remotes entry needs a non-empty string "{key}"',
                 )
-            # Like duplicate member names: the later entry would win
-            # silently, and which URL a member gets must not depend on
-            # declaration order.
+            # Like duplicate member names: the later entry would win silently, and which URL a
+            # member gets must not depend on declaration order.
             _expect(
                 remote["name"] not in remote_names,
                 f'{where}: remote name {remote["name"]} used twice',
@@ -649,20 +650,21 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
             )
             name = md["name"]
             here = f"{where}: member {name}"
-            # String keys use presence checks so an explicit null is an
-            # error: it would otherwise crash path joining or coerce to
-            # the literal revision "None".
+            # String keys use presence checks so an explicit null is an error: it would otherwise
+            # crash path joining or coerce to the literal revision "None".
             for key in ("description", "remote", "repo-path", "url", "path"):
                 if key in md:
                     _expect(
                         isinstance(md[key], str),
                         f'{here}: "{key}" is not a string',
                     )
-            # An empty string would silently fall back to a default (or
-            # crash path derivation); reject it like an explicit null.
+            # An empty string would silently fall back to a default (or crash path derivation);
+            # reject it like an explicit null.
             for key in ("remote", "repo-path", "url", "path"):
                 if key in md and md[key] == "":
-                    raise MalformedManifest(f'{here}: "{key}" is empty; remove the key or ' "set a value")
+                    raise MalformedManifest(
+                        f'{here}: "{key}" is empty; remove the key or set a value'
+                    )
             _check_null_keys(
                 md,
                 (
@@ -683,7 +685,8 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
                 _check_member_import(md["import"], here)
             depth = md.get("clone-depth")
             _expect(
-                depth is None or (isinstance(depth, int) and not isinstance(depth, bool) and depth >= 1),
+                depth is None
+                or (isinstance(depth, int) and not isinstance(depth, bool) and depth >= 1),
                 f'{here}: "clone-depth" is not a positive integer',
             )
             if "revision" in md:
@@ -691,7 +694,7 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
             ce = md.get("extension-commands")
             _expect(
                 ce is None or _is_str_or_str_list(ce),
-                f'{here}: "extension-commands" is not a string ' "or list of strings",
+                f'{here}: "extension-commands" is not a string or list of strings',
             )
             _check_cmake_packages(md.get("cmake-packages"), here)
             groups = md.get("groups")
@@ -718,11 +721,10 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
                 f'{where}: self: "name" is not a string',
             )
         if isinstance(name, str):
-            # A suggested clone-directory name only, never a path: the
-            # manifest author must not steer placement on the caller's
-            # filesystem. Leading dots are refused entirely: they cover
-            # ".", "..", and hidden or git-confusing names (".git",
-            # ".repospace") the author must not create either.
+            # A suggested clone-directory name only, never a path: the manifest author must not
+            # steer placement on the caller's filesystem. Leading dots are refused entirely: they
+            # cover ".", "..", and hidden or git-confusing names (".git", ".repospace") the author
+            # must not create either.
             _expect(
                 name != "" and not name.startswith(".") and "/" not in name and "\\" not in name,
                 f'{where}: self: "name" must be a single plain path '
@@ -731,7 +733,7 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
         ce = slf.get("extension-commands")
         _expect(
             ce is None or _is_str_or_str_list(ce),
-            f'{where}: self: "extension-commands" is not a string ' "or list of strings",
+            f'{where}: self: "extension-commands" is not a string or list of strings',
         )
         _check_cmake_packages(slf.get("cmake-packages"), f"{where}: self")
 
@@ -762,10 +764,9 @@ _FilterFn = Optional[Callable[[Member], bool]]
 def _import_requested(imp: Any) -> bool:
     """True if a member "import" value requests an import.
 
-    An absent key requests nothing, and "import: false" is the explicit
-    way to say so (validation rejects an explicit null). Any other value
-    is a request — including an empty mapping, since every import-map
-    key is optional.
+    An absent key requests nothing, and "import: false" is the explicit way to say so (validation
+    rejects an explicit null). Any other value is a request — including an empty mapping, since
+    every import-map key is optional.
     """
     return imp is not None and imp is not False
 
@@ -773,7 +774,7 @@ def _import_requested(imp: Any) -> bool:
 def _load_import_map(imp: dict, where: str) -> _ImportMap:
     _expect(
         not (set(imp) - _IMPORT_MAP_KEYS),
-        f"{where}: invalid import contents: " f"{_key_list(set(imp) - _IMPORT_MAP_KEYS)}",
+        f"{where}: invalid import contents: {_key_list(set(imp) - _IMPORT_MAP_KEYS)}",
     )
     _check_null_keys(imp, sorted(_IMPORT_MAP_KEYS), where)
     lists = {}
@@ -791,18 +792,18 @@ def _load_import_map(imp: dict, where: str) -> _ImportMap:
         lists[key] = _str_list(value)
     for key in ("path-allowlist", "path-blocklist"):
         for pattern in lists[key]:
-            # A pattern with no path components ("" or ".") matches
-            # nothing and makes PurePath.match raise; like the other
-            # empty strings in a manifest it is an editing artifact.
+            # A pattern with no path components ("" or ".") matches nothing and makes PurePath.match
+            # raise; like the other empty strings in a manifest it is an editing artifact.
             _expect(
                 bool(PurePosixPath(pattern).parts),
-                f'{where}: import "{key}" entry "{pattern}" is not a ' "path pattern; remove it or set a value",
+                f'{where}: import "{key}" entry "{pattern}" is not a '
+                "path pattern; remove it or set a value",
             )
     file = imp.get("file", MANIFEST_FILE)
     _expect(isinstance(file, str), f'{where}: import "file" is not a string')
     if file == "":
-        # An empty path would import the repository root directory, not
-        # fall back to the default; almost certainly an editing artifact.
+        # An empty path would import the repository root directory, not fall back to the default;
+        # almost certainly an editing artifact.
         raise MalformedManifest(f'{where}: import "file" is empty; remove the key or set a value')
     prefix = imp.get("path-prefix", "")
     _expect(
@@ -820,7 +821,9 @@ def _load_import_map(imp: dict, where: str) -> _ImportMap:
 
 
 def _import_map_filter(imap: _ImportMap) -> _FilterFn:
-    if not (imap.name_allowlist or imap.name_blocklist or imap.path_allowlist or imap.path_blocklist):
+    if not (
+        imap.name_allowlist or imap.name_blocklist or imap.path_allowlist or imap.path_blocklist
+    ):
         return None
 
     def check(member: Member) -> bool:
@@ -866,8 +869,8 @@ class _Branch:
     """Per-recursion-branch import context."""
 
     origin: str
-    #: The member whose git data this document came from, or None when
-    #: it came from the manifest repository's filesystem.
+    #: The member whose git data this document came from, or None when it came from the manifest
+    #: repository's filesystem.
     origin_member: Optional[Member]
     repo_abspath: Optional[str]
     imap_filter: _FilterFn
@@ -876,11 +879,9 @@ class _Branch:
     cmake_packages_sink: List[str]
     depth: int
     where: str
-    #: Ancestor chain of the documents being resolved on this branch,
-    #: as (key, label) pairs, for cycle detection. Keys are
-    #: (None, realpath) for filesystem documents and
-    #: (member name, normalized path) for documents read from a
-    #: member's git data.
+    #: Ancestor chain of the documents being resolved on this branch, as (key, label) pairs, for
+    #: cycle detection. Keys are (None, realpath) for filesystem documents and (member name,
+    #: normalized path) for documents read from a member's git data.
     chain: Tuple[Tuple[Any, str], ...] = ()
 
 
@@ -893,9 +894,8 @@ class _Defaults:
 def _check_import_cycle(key, label: str, branch: _Branch) -> None:
     """Reject an import whose target is already being resolved.
 
-    Only the ancestor chain counts: the same file imported on two
-    sibling branches (a diamond) is legal, and duplicate members are
-    handled by first-definition-wins.
+    Only the ancestor chain counts: the same file imported on two sibling branches (a diamond) is
+    legal, and duplicate members are handled by first-definition-wins.
     """
     for seen_key, _ in branch.chain:
         if seen_key == key:
@@ -907,7 +907,9 @@ def _decode_import_data(member: Member, path: str, data: bytes) -> str:
     try:
         return data.decode(_ENCODING)
     except UnicodeDecodeError as err:
-        raise MalformedManifest(f"{member.name_and_path}: import data {path} is not valid " f"UTF-8: {err}")
+        raise MalformedManifest(
+            f"{member.name_and_path}: import data {path} is not valid UTF-8: {err}"
+        )
 
 
 def _git_mode_at(member: Member, path: str, rev: str) -> str:
@@ -920,31 +922,32 @@ def _git_mode_at(member: Member, path: str, rev: str) -> str:
     )
     if result.returncode != 0:
         return ""
-    # Records are "<mode> <type> <object>\t<name>\0"; the name may be
-    # any byte sequence, the metadata before the tab is always ASCII.
+    # Records are "<mode> <type> <object>\t<name>\0"; the name may be any byte sequence, the
+    # metadata before the tab is always ASCII.
     meta = result.stdout.split(b"\0")[0].partition(b"\t")[0].split()
     return meta[0].decode("ascii", "replace") if meta else ""
 
 
 def _symlinked_member_import(member: Member, path: str) -> MalformedManifest:
     return MalformedManifest(
-        f"{member.name_and_path}: import path {path} is a symbolic link; " "symlinked manifest data is not allowed"
+        f"{member.name_and_path}: import path {path} is a symbolic link; "
+        "symlinked manifest data is not allowed"
     )
 
 
 def _symlinked_import(where: str, imp: str, file: Any) -> MalformedManifest:
     return MalformedManifest(
-        f'{where}: "self: import: {imp}": {file} is a symbolic link; ' "symlinked manifest data is not allowed"
+        f'{where}: "self: import: {imp}": {file} is a symbolic link; '
+        "symlinked manifest data is not allowed"
     )
 
 
 def member_manifest_content(member: Member, path: str) -> List[str]:
     """Read manifest content at *path* from a member's repospace-rev.
 
-    A blob yields a single document; a tree yields every .yml/.yaml file
-    in it, sorted by name. Raises FileNotFoundError if the path does not
-    exist at repospace-rev, and CalledProcessError on other git failures
-    (e.g. no repospace-rev ref yet).
+    A blob yields a single document; a tree yields every .yml/.yaml file in it, sorted by name.
+    Raises FileNotFoundError if the path does not exist at repospace-rev, and CalledProcessError on
+    other git failures (e.g. no repospace-rev ref yet).
     """
     spec = f"{QUAL_MANIFEST_REV}:{path}"
     result = member.git(
@@ -954,8 +957,8 @@ def member_manifest_content(member: Member, path: str) -> List[str]:
         capture_stderr=True,
     )
     if result.returncode != 0:
-        # Error message wording varies across git versions; ask git
-        # whether the ref itself exists instead of parsing stderr.
+        # Error message wording varies across git versions; ask git whether the ref itself exists
+        # instead of parsing stderr.
         ref = member.git(
             ["rev-parse", "--verify", "--quiet", QUAL_MANIFEST_REV],
             check=False,
@@ -963,13 +966,13 @@ def member_manifest_content(member: Member, path: str) -> List[str]:
             capture_stderr=True,
         )
         if ref.returncode != 0:
-            raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
+            # Always raises here: the status is known to be non-zero.
+            result.check_returncode()
         raise FileNotFoundError(path)
     objtype = result.stdout.decode().strip()
     if objtype == "blob":
-        # A committed symlink is a blob too, and its link target would
-        # be parsed as manifest data; the filesystem side refuses one
-        # as well, so an import behaves the same by either route.
+        # A committed symlink is a blob too, and its link target would be parsed as manifest data;
+        # the filesystem side refuses one as well, so an import behaves the same by either route.
         if _git_mode_at(member, path, QUAL_MANIFEST_REV) == _SYMLINK_MODE:
             raise _symlinked_member_import(member, path)
         return [_decode_import_data(member, path, member.read_at(path))]
@@ -982,11 +985,10 @@ def member_manifest_content(member: Member, path: str) -> List[str]:
         names = []
         for entry in listing.split("\0"):
             meta, _, name = entry.partition("\t")
-            # Only blobs: a subdirectory or submodule whose name ends
-            # in .yml/.yaml is not manifest data (mirrors the is_file
-            # check on the filesystem side). Matched by suffix, not
-            # endswith, also mirroring the filesystem side: a dotfile
-            # named just ".yml" has no suffix.
+            # Only blobs: a subdirectory or submodule whose name ends in .yml/.yaml is not manifest
+            # data (mirrors the is_file check on the filesystem side). Matched by suffix, not
+            # endswith, also mirroring the filesystem side: a dotfile named just ".yml" has no
+            # suffix.
             if PurePosixPath(name).suffix not in (".yml", ".yaml"):
                 continue
             mode, kind = meta.split()[:2]
@@ -995,7 +997,10 @@ def member_manifest_content(member: Member, path: str) -> List[str]:
             if kind == "blob":
                 names.append(name)
         names.sort()
-        return [_decode_import_data(member, f"{path}/{name}", member.read_at(f"{path}/{name}")) for name in names]
+        return [
+            _decode_import_data(member, f"{path}/{name}", member.read_at(f"{path}/{name}"))
+            for name in names
+        ]
     raise MalformedManifest(
         f"{member.name_and_path}: import path {path} is a git object of "
         f'type "{objtype}"; expected a file or directory'
@@ -1005,16 +1010,16 @@ def member_manifest_content(member: Member, path: str) -> List[str]:
 def manifest_file(topdir: str, config: Optional[Configuration]) -> str:
     """Return the absolute path of the selected top-level manifest file.
 
-    The manifest.file configuration option selects the file (default:
-    repospace.yaml), as a relative path inside the manifest repository —
-    the same confinement imports have.
+    The manifest.file configuration option selects the file (default: repospace.yaml), as a relative
+    path inside the manifest repository — the same confinement imports have.
     """
     name = MANIFEST_FILE
     if config is not None:
         name = config.get("manifest.file", MANIFEST_FILE) or MANIFEST_FILE
     if os.path.isabs(name):
         raise MalformedManifest(
-            f'manifest.file "{name}" is an absolute path; it must be ' "relative to the repospace topdir"
+            f'manifest.file "{name}" is an absolute path; it must be '
+            "relative to the repospace topdir"
         )
     path = os.path.join(topdir, name)
     if util.escapes_directory(path, topdir):
@@ -1047,10 +1052,9 @@ class Manifest:
     ) -> "Manifest":
         """Load the repospace's top-level manifest.
 
-        A repospace is always colocated with its manifest repository: the
-        topdir is the manifest repository, marked by the .repospace/
-        directory. The manifest.file configuration option selects the
-        manifest file (default: repospace.yaml).
+        A repospace is always colocated with its manifest repository: the topdir is the manifest
+        repository, marked by the .repospace/ directory. The manifest.file configuration option
+        selects the manifest file (default: repospace.yaml).
         """
         if topdir is None:
             topdir = util.topdir()
@@ -1090,11 +1094,10 @@ class Manifest:
                 topdir = util.topdir(os.path.dirname(source_file))
             except util.RepospaceNotFound:
                 topdir = None
-        # A repospace is always colocated with its manifest repository,
-        # so inside a repospace the manifest repository is the topdir
-        # even when the file lives in a subdirectory — the anchoring
-        # from_topdir uses. Outside any repospace, the file's directory
-        # is the best available anchor.
+        # A repospace is always colocated with its manifest repository, so inside a repospace the
+        # manifest repository is the topdir even when the file lives in a subdirectory — the
+        # anchoring from_topdir uses. Outside any repospace, the file's directory is the best
+        # available anchor.
         repo_abspath = topdir if topdir is not None else os.path.dirname(source_file)
         try:
             with open(source_file, encoding=_ENCODING) as f:
@@ -1173,9 +1176,8 @@ class Manifest:
         self.has_imports = shared.has_imports
         self.group_filter = self._final_group_filter(shared.group_filter_q)
 
-        # A repospace is always colocated with its manifest repository,
-        # so with a topdir the manifest repository is the topdir itself,
-        # whichever route the data came by.
+        # A repospace is always colocated with its manifest repository, so with a topdir the
+        # manifest repository is the topdir itself, whichever route the data came by.
         manifest_member = ManifestMember(
             path="." if topdir else None,
             topdir=topdir,
@@ -1218,8 +1220,8 @@ class Manifest:
     def _member_by_path(self, value: str) -> Optional[Member]:
         if self.topdir is None:
             return None
-        # realpath, like Member.abspath, so a repospace reached through
-        # a symlink above its topdir still matches.
+        # realpath, like Member.abspath, so a repospace reached through a symlink above its topdir
+        # still matches.
         target = Path(os.path.realpath(value))
         for member in self.members:
             if member.abspath and Path(member.abspath) == target:
@@ -1229,14 +1231,15 @@ class Manifest:
     def is_active(self, member: Member, extra_filter=None) -> bool:
         """Return True unless all of the member's groups are disabled.
 
-        *extra_filter* is an optional list of "+group"/"-group" entries
-        applied after the manifest's own filter and the configured one.
-        An entry that is empty or does not begin with "+" or "-" raises
-        ValueError.
+        *extra_filter* is an optional list of "+group"/"-group" entries applied after the manifest's
+        own filter and the configured one. An entry that is empty or does not begin with "+" or "-"
+        raises ValueError.
         """
         for entry in extra_filter or []:
             if not entry or entry[0] not in "+-":
-                raise ValueError(f'invalid group filter entry "{entry}"; entries must begin ' 'with "+" or "-"')
+                raise ValueError(
+                    f'invalid group filter entry "{entry}"; entries must begin with "+" or "-"'
+                )
         if not member.groups:
             return True
         disabled = set()
@@ -1251,9 +1254,8 @@ class Manifest:
     def _config_group_filter(self) -> List[str]:
         """Parse the manifest.group-filter configuration option.
 
-        Parsed once per Manifest: is_active runs once per grouped
-        member per command, and an invalid item must be warned about
-        once, not once per call.
+        Parsed once per Manifest: is_active runs once per grouped member per command, and an invalid
+        item must be warned about once, not once per call.
         """
         if self._config_filter is None:
             entries = []
@@ -1298,8 +1300,8 @@ class Manifest:
                 md["revision"] = member.sha(QUAL_MANIFEST_REV, capture_stderr=True)
             except (subprocess.CalledProcessError, RuntimeError, OSError):
                 if not self.is_active(member):
-                    # Plain "repospace update" skips inactive members,
-                    # so the generic advice below would be a dead end.
+                    # Plain "repospace update" skips inactive members, so the generic advice below
+                    # would be a dead end.
                     raise RuntimeError(
                         f"cannot freeze: inactive member "
                         f"{member.name_and_path} is not cloned or has no "
@@ -1335,9 +1337,8 @@ class Manifest:
         top_level: bool = False,
     ) -> None:
         if branch.depth > _MAX_IMPORT_DEPTH:
-            # Attribute the failure to the member whose git data this
-            # document came from; None (rendered "self") only for
-            # documents read from the manifest repository itself.
+            # Attribute the failure to the member whose git data this document came from; None
+            # (rendered "self") only for documents read from the manifest repository itself.
             raise ManifestImportFailed(branch.origin_member, branch.where, "import level too deep")
 
         self._load_self(mdata, shared, branch, top_level)
@@ -1362,14 +1363,15 @@ class Manifest:
         if imp is not None:
             self._import_from_self(imp, shared, branch)
 
-        # Self-imported values were merged into the sinks above; the
-        # current file's own values come after them, so self-imports
-        # take precedence.
+        # Self-imported values were merged into the sinks above; the current file's own values come
+        # after them, so self-imports take precedence.
         branch.extension_commands_sink[:] = _merge_unique(
             branch.extension_commands_sink,
             _str_list(slf.get("extension-commands")),
         )
-        branch.cmake_packages_sink[:] = _merge_unique(branch.cmake_packages_sink, _str_list(slf.get("cmake-packages")))
+        branch.cmake_packages_sink[:] = _merge_unique(
+            branch.cmake_packages_sink, _str_list(slf.get("cmake-packages"))
+        )
 
     def _import_from_self(self, imp, shared: _Shared, branch: _Branch, _seen=frozenset()):
         if isinstance(imp, bool):
@@ -1381,15 +1383,18 @@ class Manifest:
         shared.has_imports = True
         if isinstance(imp, str):
             if not imp:
-                raise MalformedManifest(f'{branch.where}: "self: import" is empty; remove the ' "key or set a value")
+                raise MalformedManifest(
+                    f'{branch.where}: "self: import" is empty; remove the key or set a value'
+                )
             self._import_path_from_self(imp, shared, branch)
         elif isinstance(imp, list):
-            # A YAML alias can make a sequence contain itself; like
-            # _check_import_cycle, only the ancestor chain counts, so a
-            # diamond (the same anchored list aliased twice as siblings)
+            # A YAML alias can make a sequence contain itself; like _check_import_cycle, only the
+            # ancestor chain counts, so a diamond (the same anchored list aliased twice as siblings)
             # stays legal.
             if id(imp) in _seen:
-                raise MalformedManifest(f'{branch.where}: "self: import" contains a recursive ' "YAML alias")
+                raise MalformedManifest(
+                    f'{branch.where}: "self: import" contains a recursive YAML alias'
+                )
             for subimp in imp:
                 self._import_from_self(subimp, shared, branch, _seen | {id(imp)})
         elif isinstance(imp, dict):
@@ -1401,7 +1406,9 @@ class Manifest:
             )
             self._import_path_from_self(imap.file, shared, child)
         else:
-            raise MalformedManifest(f'{branch.where}: "self: import: {imp}" has invalid type ' f"{type(imp).__name__}")
+            raise MalformedManifest(
+                f'{branch.where}: "self: import: {imp}" has invalid type {type(imp).__name__}'
+            )
 
     def _import_path_from_self(self, imp: str, shared: _Shared, branch: _Branch) -> None:
         pathobj = Path(imp)
@@ -1411,52 +1418,53 @@ class Manifest:
             self._import_member_self_path(imp, shared, branch)
             return
         target = Path(branch.repo_abspath) / pathobj
-        # Manifest data is never read through a symlink, whichever route
-        # it comes by: git stores a symlink as a blob, so on the git
-        # side a linked file's target text would be parsed as YAML and
-        # a path through a linked directory would not resolve at all,
-        # and the two routes must not disagree about the same
-        # repository. Every component below the repository root is
-        # checked, as _check_paths_are_confined does for member paths;
-        # the root itself and anything above it is the user's placement.
+        # Manifest data is never read through a symlink, whichever route it comes by: git stores a
+        # symlink as a blob, so on the git side a linked file's target text would be parsed as YAML
+        # and a path through a linked directory would not resolve at all, and the two routes must
+        # not disagree about the same repository. Every component below the repository root is
+        # checked, as _check_paths_are_confined does for member paths; the root itself and anything
+        # above it is the user's placement.
         current = Path(branch.repo_abspath)
         for part in pathobj.parts:
             current = current / part
             if current.is_symlink():
                 raise _symlinked_import(branch.where, imp, current)
         if util.escapes_directory(target, branch.repo_abspath):
-            raise MalformedManifest(f'{branch.where}: "self: import: {imp}": path escapes ' "the manifest repository")
-        # An unreadable path raises OSError, not the "does it exist"
-        # False that the query methods give for a missing one; wrap it
-        # like the top-level manifest read, so callers catching
-        # MalformedManifest cover it (a permission problem must not
-        # become a traceback).
+            raise MalformedManifest(
+                f'{branch.where}: "self: import: {imp}": path escapes the manifest repository'
+            )
+        # An unreadable path raises OSError, not the "does it exist" False that the query methods
+        # give for a missing one; wrap it like the top-level manifest read, so callers catching
+        # MalformedManifest cover it (a permission problem must not become a traceback).
         try:
             if target.is_file():
                 files = [target]
             elif target.is_dir():
-                # Symlinks are collected too, though they are refused
-                # below: skipping them here would silently ignore a
-                # link the git route reports as an error.
+                # Symlinks are collected too, though they are refused below: skipping them here
+                # would silently ignore a link the git route reports as an error.
                 files = sorted(
                     child
                     for child in target.iterdir()
                     if child.suffix in (".yml", ".yaml") and (child.is_symlink() or child.is_file())
                 )
             else:
-                hint = "this is neither a file nor a directory" if target.exists() else "file not found"
+                hint = (
+                    "this is neither a file nor a directory"
+                    if target.exists()
+                    else "file not found"
+                )
                 raise MalformedManifest(f'{branch.where}: "self: import: {imp}": {hint}')
         except OSError as err:
             raise MalformedManifest(f'{branch.where}: "self: import: {imp}": cannot read: {err}')
         for file in files:
             if file.is_symlink():
                 raise _symlinked_import(branch.where, imp, file)
-            # A file inside an imported directory could still lie
-            # outside the repository (through a mount, say); check each
-            # file, not just the directory.
+            # A file inside an imported directory could still lie outside the repository (through a
+            # mount, say); check each file, not just the directory.
             if util.escapes_directory(file, branch.repo_abspath):
                 raise MalformedManifest(
-                    f'{branch.where}: "self: import: {imp}": {file} ' "escapes the manifest repository"
+                    f'{branch.where}: "self: import: {imp}": {file} '
+                    "escapes the manifest repository"
                 )
             key = (None, os.path.realpath(file))
             _check_import_cycle(key, str(file), branch)
@@ -1469,22 +1477,25 @@ class Manifest:
             try:
                 text = file.read_text(encoding=_ENCODING)
             except (OSError, UnicodeDecodeError) as err:
-                raise MalformedManifest(f'{branch.where}: "self: import: {imp}": cannot read ' f"{file}: {err}")
+                raise MalformedManifest(
+                    f'{branch.where}: "self: import: {imp}": cannot read {file}: {err}'
+                )
             child_mdata = validate(text, str(file))
             self._load_file(child_mdata, shared, child)
 
     def _import_member_self_path(self, imp: str, shared: _Shared, branch: _Branch) -> None:
         """Resolve a self-import declared by a member-imported manifest.
 
-        The importing document came from the member's git data at
-        repospace-rev, so the imported files are read from there too —
-        never from the member's working tree, which may be checked out
-        somewhere else entirely.
+        The importing document came from the member's git data at repospace-rev, so the imported
+        files are read from there too — never from the member's working tree, which may be checked
+        out somewhere else entirely.
         """
         member = branch.origin_member
         norm = posixpath.normpath(imp)
         if PurePosixPath(norm).parts[:1] == ("..",):
-            raise MalformedManifest(f'{branch.where}: "self: import: {imp}": path escapes ' "the member repository")
+            raise MalformedManifest(
+                f'{branch.where}: "self: import: {imp}": path escapes the member repository'
+            )
         key = (member.name, norm)
         where = f"{norm} (self-imported from member {member.name})"
         _check_import_cycle(key, where, branch)
@@ -1508,8 +1519,8 @@ class Manifest:
         entries = []
         for item in raw:
             if isinstance(item, (int, float)) and not isinstance(item, bool):
-                # YAML parses signed numbers: a filter written as -1
-                # arrives here as the integer -1, sign already consumed.
+                # YAML parses signed numbers: a filter written as -1 arrives here as the integer -1,
+                # sign already consumed.
                 raise MalformedManifest(
                     f"{branch.where}: group filter contains numeric item "
                     f'"{item}"; this must begin with "+" or "-"; '
@@ -1518,7 +1529,8 @@ class Manifest:
             item = str(item)
             if not item or item[0] not in "+-":
                 raise MalformedManifest(
-                    f"{branch.where}: group filter contains invalid item " f'"{item}"; this must begin with "+" or "-"'
+                    f"{branch.where}: group filter contains invalid item "
+                    f'"{item}"; this must begin with "+" or "-"'
                 )
             if not is_group(item[1:]):
                 raise MalformedManifest(
@@ -1526,9 +1538,8 @@ class Manifest:
                     f'"{item}"; "{item[1:]}" is an invalid group name'
                 )
             entries.append(item)
-        # Filters from files loaded later end up earlier in the queue;
-        # final application iterates left to right with later entries
-        # winning, so the load hierarchy's precedence is preserved
+        # Filters from files loaded later end up earlier in the queue; final application iterates
+        # left to right with later entries winning, so the load hierarchy's precedence is preserved
         # (self-imports beat the top level, which beats member imports).
         shared.group_filter_q.appendleft(entries)
 
@@ -1561,23 +1572,23 @@ class Manifest:
             member = self._load_member(md, shared, branch, url_bases, defaults)
             name = member.name
 
-            # Duplicates are checked before the import filter: a file
-            # declaring the same name twice is malformed regardless of
-            # which occurrences an importing manifest happens to keep.
+            # Duplicates are checked before the import filter: a file declaring the same name twice
+            # is malformed regardless of which occurrences an importing manifest happens to keep.
             if name in names:
                 raise MalformedManifest(f"{branch.where}: member name {name} used twice")
             names.add(name)
 
             if not _filter_allows(branch.imap_filter, member):
                 _logger.debug(
-                    f"member {name} in {branch.where} ignored: an importing " "manifest blocked or did not allow it"
+                    f"member {name} in {branch.where} ignored: an importing "
+                    "manifest blocked or did not allow it"
                 )
                 continue
 
             if name in shared.members:
-                # First definition wins; this one is ignored, and its
-                # import (if any) is never processed.
-                _logger.debug(f"member {name} in {branch.where} ignored: " "already defined")
+                # First definition wins; this one is ignored, and its import (if any) is never
+                # processed.
+                _logger.debug(f"member {name} in {branch.where} ignored: already defined")
                 continue
             shared.members[name] = member
 
@@ -1607,10 +1618,13 @@ class Manifest:
                 "the name is reserved for the manifest repository"
             )
         if "/" in name or "\\" in name:
-            raise MalformedManifest(f'{branch.where}: member name "{name}" contains a path ' "separator")
+            raise MalformedManifest(
+                f'{branch.where}: member name "{name}" contains a path separator'
+            )
         if any(c.isspace() or c == "," for c in name):
             _logger.warning(
-                f'{branch.where}: member name "{name}" contains whitespace ' "or a comma; this is discouraged"
+                f'{branch.where}: member name "{name}" contains whitespace '
+                "or a comma; this is discouraged"
             )
 
         url = md.get("url")
@@ -1622,7 +1636,9 @@ class Manifest:
             remote = defaults.remote
         if url:
             if repo_path:
-                raise MalformedManifest(f'{where} has both "repo-path: {repo_path}" ' f'and "url: {url}"')
+                raise MalformedManifest(
+                    f'{where} has both "repo-path: {repo_path}" and "url: {url}"'
+                )
         elif remote:
             if remote not in url_bases:
                 raise MalformedManifest(f"{where}: remote {remote} is not defined")
@@ -1630,11 +1646,10 @@ class Manifest:
         else:
             raise MalformedManifest(f"{where} has no remote or url and no default remote is set")
 
-        # A path-prefix in the member's own "import" scopes only to the
-        # imported content; the member's placement is its declaring
-        # file's prefix plus "path". The result is normalized here so
-        # that the checks below, the placement, and as_dict() all speak
-        # of the same directory: "ext/a/.." is the directory "ext".
+        # A path-prefix in the member's own "import" scopes only to the imported content; the
+        # member's placement is its declaring file's prefix plus "path". The result is normalized
+        # here so that the checks below, the placement, and as_dict() all speak of the same
+        # directory: "ext/a/.." is the directory "ext".
         imp = md.get("import")
         declared_path = md.get("path", name)
         path = posixpath.normpath((branch.path_prefix / declared_path).as_posix())
@@ -1671,22 +1686,24 @@ class Manifest:
             declared_by=branch.origin,
         )
 
-        # Purely lexical path checks; the filesystem is consulted later,
-        # by _check_paths_are_confined. Member paths are POSIX, so
-        # normalize with posixpath: os.path.normpath would switch to
-        # backslashes on Windows and defeat the component checks below.
+        # Purely lexical path checks; the filesystem is consulted later, by
+        # _check_paths_are_confined. Member paths are POSIX, so normalize with posixpath:
+        # os.path.normpath would switch to backslashes on Windows and defeat the component checks
+        # below.
         if "\\" in member.path:
             raise MalformedManifest(
-                f"{where} path {member.path} contains a backslash; " "member paths use forward slashes"
+                f"{where} path {member.path} contains a backslash; "
+                "member paths use forward slashes"
             )
         norm = posixpath.normpath(member.path)
         if norm.startswith("/") or os.path.isabs(norm):
             raise MalformedManifest(
-                f"{where} has absolute path {member.path}; this must be " "relative to the repospace topdir"
+                f"{where} has absolute path {member.path}; this must be "
+                "relative to the repospace topdir"
             )
         if norm[1:2] == ":":
-            # On Windows a drive-relative path like "C:evil" is not
-            # "absolute", yet joining it discards the topdir entirely.
+            # On Windows a drive-relative path like "C:evil" is not "absolute", yet joining it
+            # discards the topdir entirely.
             raise MalformedManifest(
                 f"{where} path {member.path} begins with a drive letter; "
                 "this must be relative to the repospace topdir"
@@ -1695,24 +1712,25 @@ class Manifest:
             raise MalformedManifest(f"{where} path {declared_path} is the repospace topdir itself")
         prefix = posixpath.normpath(branch.path_prefix.as_posix())
         if norm == prefix:
-            # Same mistake one level down: under an import path-prefix,
-            # "path: ." names the prefix directory, not a member of
-            # its own.
+            # Same mistake one level down: under an import path-prefix, "path: ." names the prefix
+            # directory, not a member of its own.
             raise MalformedManifest(
-                f"{where} path {declared_path} is the import path-prefix " f"directory {prefix} itself"
+                f"{where} path {declared_path} is the import path-prefix "
+                f"directory {prefix} itself"
             )
-        # The first component, not a string prefix: "..foo" is a valid
-        # directory name.
+        # The first component, not a string prefix: "..foo" is a valid directory name.
         if PurePosixPath(norm).parts[0] == "..":
             raise MalformedManifest(
-                f"{where} path {declared_path} normalizes to {norm}, " "which escapes the repospace topdir"
+                f"{where} path {declared_path} normalizes to {norm}, "
+                "which escapes the repospace topdir"
             )
         if PurePosixPath(norm).parts[0] == util.REPOSPACE_DIR:
-            raise MalformedManifest(f"{where} path {member.path} is inside the " f"{util.REPOSPACE_DIR} directory")
-        # Any component named ".git" (in any case: some filesystems are
-        # case-insensitive) could place member content where git treats
-        # it as a git directory — hooks included, which git executes on
-        # the next command. Git itself refuses to track such paths.
+            raise MalformedManifest(
+                f"{where} path {member.path} is inside the {util.REPOSPACE_DIR} directory"
+            )
+        # Any component named ".git" (in any case: some filesystems are case-insensitive) could
+        # place member content where git treats it as a git directory — hooks included, which git
+        # executes on the next command. Git itself refuses to track such paths.
         if any(p.lower() == ".git" for p in PurePosixPath(norm).parts):
             raise MalformedManifest(f'{where} path {member.path} contains a ".git" component')
         return member
@@ -1732,7 +1750,9 @@ class Manifest:
                     and not (set(item) - {"path", "name"})
                 )
                 if not ok:
-                    raise MalformedManifest(f"{where}: invalid submodule element {item} " f"at index {index}")
+                    raise MalformedManifest(
+                        f"{where}: invalid submodule element {item} at index {index}"
+                    )
                 result.append(Submodule(item["path"], item.get("name")))
             return result
         raise MalformedManifest(f"{where}: invalid submodules: {value}; expected a list or boolean")
@@ -1748,20 +1768,24 @@ class Manifest:
         shared.has_imports = True
         if isinstance(imp, bool):
             if not imp:
-                raise MalformedManifest(f"{branch.where}: member {member.name}: " 'falsy "import" inside a sequence')
+                raise MalformedManifest(
+                    f'{branch.where}: member {member.name}: falsy "import" inside a sequence'
+                )
             self._import_files_from_member(member, MANIFEST_FILE, shared, branch, None)
         elif isinstance(imp, str):
             if not imp:
                 raise MalformedManifest(
-                    f'{branch.where}: member {member.name}: "import" is ' "empty; remove the key or set a value"
+                    f'{branch.where}: member {member.name}: "import" is '
+                    "empty; remove the key or set a value"
                 )
             self._import_files_from_member(member, imp, shared, branch, None)
         elif isinstance(imp, list):
-            # See _import_from_self: reject a sequence that contains
-            # itself through a YAML alias; sibling aliases stay legal.
+            # See _import_from_self: reject a sequence that contains itself through a YAML alias;
+            # sibling aliases stay legal.
             if id(imp) in _seen:
                 raise MalformedManifest(
-                    f'{branch.where}: member {member.name}: "import" ' "contains a recursive YAML alias"
+                    f'{branch.where}: member {member.name}: "import" '
+                    "contains a recursive YAML alias"
                 )
             for subimp in imp:
                 self._import_from_member(member, subimp, shared, branch, _seen | {id(imp)})
@@ -1770,7 +1794,8 @@ class Manifest:
             self._import_files_from_member(member, imap.file, shared, branch, imap)
         else:
             raise MalformedManifest(
-                f"{branch.where}: member {member.name}: invalid import " f"{imp} of type {type(imp).__name__}"
+                f"{branch.where}: member {member.name}: invalid import "
+                f"{imp} of type {type(imp).__name__}"
             )
 
     def _import_files_from_member(
@@ -1781,23 +1806,25 @@ class Manifest:
         branch: _Branch,
         imap: Optional[_ImportMap],
     ) -> None:
-        # Confined like a self-import path: git would refuse to read an
-        # absolute or escaping path anyway, and the read failure would
-        # then be reported as a stale repospace-rev, advising an update
-        # that cannot help.
+        # Confined like a self-import path: git would refuse to read an absolute or escaping path
+        # anyway, and the read failure would then be reported as a stale repospace-rev, advising an
+        # update that cannot help.
         if posixpath.isabs(path) or os.path.isabs(path):
-            raise MalformedManifest(f'{branch.where}: member {member.name}: "import: {path}" ' "is an absolute path")
+            raise MalformedManifest(
+                f'{branch.where}: member {member.name}: "import: {path}" is an absolute path'
+            )
         norm = posixpath.normpath(path)
         if PurePosixPath(norm).parts[:1] == ("..",):
             raise MalformedManifest(
-                f'{branch.where}: member {member.name}: "import: {path}": ' "path escapes the member repository"
+                f'{branch.where}: member {member.name}: "import: {path}": '
+                "path escapes the member repository"
             )
         key = (member.name, norm)
         where = f"{path} (imported from member {member.name})"
         _check_import_cycle(key, where, branch)
-        # Read at the normalized path, as _import_member_self_path does:
-        # git does not normalize an inner ".." in a <rev>:<path> spec,
-        # and the failure would be reported as a stale repospace-rev.
+        # Read at the normalized path, as _import_member_self_path does: git does not normalize an
+        # inner ".." in a <rev>:<path> spec, and the failure would be reported as a stale
+        # repospace-rev.
         content = self._member_import_content(member, norm, shared)
         if content is None:
             return
@@ -1816,9 +1843,8 @@ class Manifest:
                 repo_abspath=member.abspath,
                 imap_filter=imap_filter,
                 path_prefix=prefix,
-                # Extension commands and CMake packages declared under
-                # the imported manifest's "self:" logically belong to
-                # the member; collect them separately and attach below.
+                # Extension commands and CMake packages declared under the imported manifest's
+                # "self:" logically belong to the member; collect them separately and attach below.
                 extension_commands_sink=[],
                 cmake_packages_sink=[],
                 depth=branch.depth + 1,
@@ -1827,16 +1853,19 @@ class Manifest:
             )
             child_mdata = validate(document, where)
             self._load_file(child_mdata, shared, child)
-            member.extension_commands = _merge_unique(member.extension_commands, child.extension_commands_sink)
+            member.extension_commands = _merge_unique(
+                member.extension_commands, child.extension_commands_sink
+            )
             member.cmake_packages = _merge_unique(member.cmake_packages, child.cmake_packages_sink)
 
-    def _member_import_content(self, member: Member, path: str, shared: _Shared) -> Optional[List[str]]:
+    def _member_import_content(
+        self, member: Member, path: str, shared: _Shared
+    ) -> Optional[List[str]]:
         content: Union[None, str, List[str]]
         cloned = member.is_cloned()
         use_git = not (shared.import_flags & ImportFlag.FORCE_MEMBERS) and cloned
-        # The local repospace-rev may be missing or stale; on failure,
-        # give the importer a chance to fix that. The reason strings
-        # only surface when there is no importer, so each failure mode
+        # The local repospace-rev may be missing or stale; on failure, give the importer a chance to
+        # fix that. The reason strings only surface when there is no importer, so each failure mode
         # keeps its own diagnosis instead of one catch-all message.
         if use_git:
             try:
@@ -1846,14 +1875,14 @@ class Manifest:
                     member,
                     path,
                     shared,
-                    f"not found at {QUAL_MANIFEST_REV}; " 'run "repospace update"',
+                    f'not found at {QUAL_MANIFEST_REV}; run "repospace update"',
                 )
             except subprocess.CalledProcessError:
                 content = self._call_importer(
                     member,
                     path,
                     shared,
-                    f"member has no {QUAL_MANIFEST_REV}; " 'run "repospace update"',
+                    f'member has no {QUAL_MANIFEST_REV}; run "repospace update"',
                 )
         elif not cloned:
             content = self._call_importer(
@@ -1863,8 +1892,8 @@ class Manifest:
                 'member is not cloned; run "repospace update"',
             )
         else:
-            # Cloned, but FORCE_MEMBERS routes everything through the
-            # importer; reachable without one only through API misuse.
+            # Cloned, but FORCE_MEMBERS routes everything through the importer; reachable without
+            # one only through API misuse.
             content = self._call_importer(member, path, shared, "no importer callback was provided")
         if content is None:
             return None
@@ -1886,26 +1915,24 @@ class Manifest:
             norm = posixpath.normpath(member.path)
             other = seen.get(norm)
             if other is not None:
-                raise MalformedManifest(f'member {member.name} path "{member.path}" is taken ' f"by {other.name}")
+                raise MalformedManifest(
+                    f'member {member.name} path "{member.path}" is taken by {other.name}'
+                )
             seen[norm] = member
 
     def _check_paths_are_confined(self) -> None:
         """Reject member paths that leave the repospace on disk.
 
-        The lexical checks in _load_member stop textual escapes; this
-        pass consults the filesystem. Member checkouts live in real
-        directories inside the repospace: no existing component of a
-        member path below the topdir may be a symlink — the member
-        directory itself included — so that neither a link committed in
-        a member nor one committed in the manifest repository can
-        redirect a checkout elsewhere. Components that do not exist yet
-        are fine; "update" creates them as directories. The topdir and
-        anything above it may be symlinks: that placement is the user's
-        own doing, not something manifest data can steer.
+        The lexical checks in _load_member stop textual escapes; this pass consults the filesystem.
+        Member checkouts live in real directories inside the repospace: no existing component of a
+        member path below the topdir may be a symlink — the member directory itself included — so
+        that neither a link committed in a member nor one committed in the manifest repository can
+        redirect a checkout elsewhere. Components that do not exist yet are fine; "update" creates
+        them as directories. The topdir and anything above it may be symlinks: that placement is the
+        user's own doing, not something manifest data can steer.
 
-        A second pass keeps the resolved check for paths nested inside
-        another member, which also catches an escape a symlink did not
-        cause (a mount point, say).
+        A second pass keeps the resolved check for paths nested inside another member, which also
+        catches an escape a symlink did not cause (a mount point, say).
         """
         if self.topdir is None:
             return
@@ -1938,7 +1965,9 @@ class Manifest:
                     break
             if owner is None:
                 continue
-            if util.escapes_directory(member.abspath, self.topdir) or not util.escapes_directory(member.abspath, rdir):
+            if util.escapes_directory(member.abspath, self.topdir) or not util.escapes_directory(
+                member.abspath, rdir
+            ):
                 raise MalformedManifest(
                     f'member {member.name} path "{member.path}" is inside '
                     f'member {owner.name} path "{owner.path}" and resolves '

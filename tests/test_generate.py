@@ -78,8 +78,14 @@ def test_packages_cmake_content(repospace, run_repospace):
     assert "FATAL_ERROR" in text
     assert "cmake --fresh" in text
 
-    app_block = "if (NOT DEFINED ENV{App_ROOT})\n" f'  set(ENV{{App_ROOT}} "{repospace.ws}")\n' "endif()"
-    liba_block = "if (NOT DEFINED ENV{LibA_ROOT})\n" f'  set(ENV{{LibA_ROOT}} "{repospace.ws / "liba"}")\n' "endif()"
+    app_block = (
+        "if (NOT DEFINED ENV{App_ROOT})\n" f'  set(ENV{{App_ROOT}} "{repospace.ws}")\n' "endif()"
+    )
+    liba_block = (
+        "if (NOT DEFINED ENV{LibA_ROOT})\n"
+        f'  set(ENV{{LibA_ROOT}} "{repospace.ws / "liba"}")\n'
+        "endif()"
+    )
     assert app_block in text
     assert liba_block in text
     # Self comes first.
@@ -116,10 +122,9 @@ def test_structural_change_changes_hash(repospace, run_repospace):
 
 
 def test_group_filter_change_changes_hash(repospace, run_repospace):
-    # A member deactivated by a group filter stays cloned at the same
-    # commit, so members.json does not move; packages.cmake loses its
-    # root, and a build tree configured against the old one must still
-    # be told that it is stale.
+    # A member deactivated by a group filter stays cloned at the same commit, so members.json does
+    # not move; packages.cmake loses its root, and a build tree configured against the old one must
+    # still be told that it is stale.
     repospace.rewrite_app_yaml(
         extra_members=(
             "    - name: libd\n"
@@ -150,7 +155,9 @@ def test_update_hash_covers_both_inputs():
 def test_duplicate_package_first_wins(repospace, run_repospace):
     repospace.rewrite_app_yaml(
         extra_members=(
-            "    - name: libd\n" f"      url: {repospace.url(repospace.libc_src)}\n" "      cmake-packages: [LibA]\n"
+            "    - name: libd\n"
+            f"      url: {repospace.url(repospace.libc_src)}\n"
+            "      cmake-packages: [LibA]\n"
         )
     )
     out, err = update(run_repospace, repospace)
@@ -164,10 +171,9 @@ def test_duplicate_package_first_wins(repospace, run_repospace):
 
 
 def test_partial_failure_records_the_members_that_moved(repospace, run_repospace):
-    # The members that did update are part of the on-disk state even
-    # when another member failed, so the generated files must describe
-    # them; otherwise the guard hash keeps blessing CMake caches that
-    # no longer match the repospace.
+    # The members that did update are part of the on-disk state even when another member failed, so
+    # the generated files must describe them; otherwise the guard hash keeps blessing CMake caches
+    # that no longer match the repospace.
     update(run_repospace, repospace)
     members_json, packages_cmake = generated(repospace)
     hash_before = guard_hash(packages_cmake)
@@ -203,8 +209,7 @@ def test_packages_cmake_excludes_inactive(repospace, run_repospace):
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: umask")
 @pytest.mark.parametrize("umask, mode", [(0o022, 0o644), (0o077, 0o600)])
 def test_generated_files_respect_umask(tmp_path, umask, mode):
-    # Two masks, because a hardcoded 0o644 would satisfy the first one
-    # on its own.
+    # Two masks, because a hardcoded 0o644 would satisfy the first one on its own.
     import os
     import stat
 
@@ -231,8 +236,8 @@ def test_packages_cmake_escapes_paths(tmp_path):
     from repospace.app.generate import packages_cmake_text
     from repospace.manifest import Manifest
 
-    # Characters in the topdir path that are special inside a quoted
-    # CMake string must be escaped in the generated file.
+    # Characters in the topdir path that are special inside a quoted CMake string must be escaped in
+    # the generated file.
     topdir = tmp_path / 'we"ird$dir'
     manifest = Manifest.from_data(
         {"manifest": {"members": [{"name": "m", "url": "u", "cmake-packages": ["Pkg"]}]}},
@@ -250,8 +255,8 @@ def test_packages_cmake_from_data_with_topdir(tmp_path):
     from repospace.app.generate import package_roots_text
     from repospace.manifest import Manifest
 
-    # In-memory manifest data with a topdir: the manifest repository
-    # is the topdir itself, so its own packages have a root too.
+    # In-memory manifest data with a topdir: the manifest repository is the topdir itself, so its
+    # own packages have a root too.
     manifest = Manifest.from_data(
         {"manifest": {"self": {"cmake-packages": ["App"]}}},
         topdir=str(tmp_path),
@@ -265,8 +270,10 @@ def test_packages_cmake_without_topdir_fails_cleanly():
     from repospace.app.generate import packages_cmake_text
     from repospace.manifest import Manifest
 
-    # Every package root is a path under the topdir; without one there
-    # is nothing to generate, and saying so beats an AttributeError.
-    manifest = Manifest.from_data({"manifest": {"members": [{"name": "m", "url": "u", "cmake-packages": ["Pkg"]}]}})
+    # Every package root is a path under the topdir; without one there is nothing to generate, and
+    # saying so beats an AttributeError.
+    manifest = Manifest.from_data(
+        {"manifest": {"members": [{"name": "m", "url": "u", "cmake-packages": ["Pkg"]}]}}
+    )
     with pytest.raises(ValueError, match="topdir"):
         packages_cmake_text(manifest, "hash")

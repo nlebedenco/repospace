@@ -26,15 +26,13 @@ Print information about members, one per line, using FORMAT.
 
 FORMAT is a Python format string; the default is
 "{_DEFAULT_FORMAT}".
-Available keys: name, description, url, path, abspath, posixpath,
-revision, sha, cloned, active, clone_depth, groups, declared_by, stale.
+Available keys: name, description, url, path, abspath, posixpath, revision, sha, cloned, active,
+clone_depth, groups, declared_by, stale.
 
-The "stale" key (also appended to default-format output) flags members
-whose on-disk state may not match the manifest: not-cloned, diverged
-(HEAD moved off repospace-rev), update-needed (declared tag/commit no
-longer matches repospace-rev), and revision/url/path-changed or added
-(manifest edited since the last update, detected via the
-.repospace/members.json snapshot).
+The "stale" key (also appended to default-format output) flags members whose on-disk state may not
+match the manifest: not-cloned, diverged (HEAD moved off repospace-rev), update-needed (declared
+tag/commit no longer matches repospace-rev), and revision/url/path-changed or added (manifest edited
+since the last update, detected via the .repospace/members.json snapshot).
 """
 
 
@@ -233,9 +231,8 @@ class List(MemberCommand):
         )
         if head.returncode == 0 and head.stdout.decode().strip() != rev_sha:
             reasons.append("diverged")
-        # A declared tag or commit that peels locally but no longer
-        # matches repospace-rev means the manifest was edited (or the
-        # tag moved) without an update.
+        # A declared tag or commit that peels locally but no longer matches repospace-rev means the
+        # manifest was edited (or the tag moved) without an update.
         peeled = member.git(
             ["rev-parse", f"{member.revision}^{{commit}}"],
             check=False,
@@ -249,7 +246,9 @@ class List(MemberCommand):
                 capture_stdout=True,
                 capture_stderr=True,
             )
-            is_branch = symbolic.returncode == 0 and symbolic.stdout.decode().strip().startswith("refs/heads/")
+            is_branch = symbolic.returncode == 0 and symbolic.stdout.decode().strip().startswith(
+                "refs/heads/"
+            )
             if not is_branch and (peeled.stdout.decode().strip() != rev_sha):
                 reasons.append("update-needed")
         return reasons
@@ -307,13 +306,15 @@ class ManifestCommand(RepospaceCommand):
             self.die(f"cannot resolve the manifest: {err}")
 
     def do_run(self, args, unknown):
-        # Every accepted option must reach the selected mode: the ones
-        # it cannot honor are rejected rather than dropped.
+        # Every accepted option must reach the selected mode: the ones it cannot honor are rejected
+        # rather than dropped.
         if args.active_only and (args.validate or args.path):
             self.parser.error("--active-only cannot be combined with --validate/--path")
         if args.validate:
             if args.out:
-                self.parser.error("-o/--out cannot be combined with --validate, which prints nothing")
+                self.parser.error(
+                    "-o/--out cannot be combined with --validate, which prints nothing"
+                )
             try:
                 Manifest.from_file(
                     self._manifest_file_path(),

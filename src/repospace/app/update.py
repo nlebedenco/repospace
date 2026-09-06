@@ -28,33 +28,29 @@ from repospace.manifest import (
 _DESCRIPTION = """\
 Clone and update members to their manifest revisions.
 
-For each active member: clone if necessary (git init + remote add, never
-git clone — repospace owns only the repospace-rev branch and "origin"
-remote names); point "origin" at the manifest URL if it changed; fetch
-if necessary ("smart" strategy skips the network when the revision is a
-tag or commit already available locally); reset refs/heads/repospace-rev
-to the resolved commit; check out detached HEAD unless -k or -r asks to
-keep or rebase a local branch; update submodules. The repospace-rev
-branch itself is never kept or rebased: HEAD is detached from it before
-it moves.
+For each active member: clone if necessary (git init + remote add, never git clone — repospace owns
+only the repospace-rev branch and "origin" remote names); point "origin" at the manifest URL if it
+changed; fetch if necessary ("smart" strategy skips the network when the revision is a tag or commit
+already available locally); reset refs/heads/repospace-rev to the resolved commit; check out
+detached HEAD unless -k or -r asks to keep or rebase a local branch; update submodules. The
+repospace-rev branch itself is never kept or rebased: HEAD is detached from it before it moves.
 
-Members whose manifests are imported are updated the moment their manifest
-data is needed during resolution, so resolution always sees fresh data.
+Members whose manifests are imported are updated the moment their manifest data is needed during
+resolution, so resolution always sees fresh data.
 """
 
 
-#: Branch a fresh member repository starts on. It never gets a commit
-#: and is never used; it only keeps HEAD off names that matter.
+#: Branch a fresh member repository starts on. It never gets a commit and is never used; it only
+#: keeps HEAD off names that matter.
 _INIT_PLACEHOLDER_BRANCH = "repospace-init-placeholder"
 
 
 def _symlink_below_topdir(topdir: str, path: str):
     """Return the first symlinked component of <topdir>/<path>, or None.
 
-    The path is walked lexically from the topdir down, so only symlinks
-    below it are reported: a repospace reached through symlinked
-    parents is the user's own doing, but inside it every member path
-    must be a real path. The member directory itself counts.
+    The path is walked lexically from the topdir down, so only symlinks below it are reported: a
+    repospace reached through symlinked parents is the user's own doing, but inside it every member
+    path must be a real path. The member directory itself counts.
     """
     prefix = topdir
     for part in posixpath.normpath(path).split("/"):
@@ -69,10 +65,9 @@ def _symlink_below_topdir(topdir: str, path: str):
 def _decode_ref(data: bytes) -> str:
     """Decode a git ref name so the exact bytes reach git again.
 
-    Ref names are byte strings; git accepts (and can be made to create)
-    names that are not valid UTF-8. Undecodable bytes are kept as
-    surrogates, which subprocess re-encodes unchanged when the name is
-    passed back on a command line.
+    Ref names are byte strings; git accepts (and can be made to create) names that are not valid
+    UTF-8. Undecodable bytes are kept as surrogates, which subprocess re-encodes unchanged when the
+    name is passed back on a command line.
     """
     return os.fsdecode(data).strip()
 
@@ -80,19 +75,17 @@ def _decode_ref(data: bytes) -> str:
 def _printable(text: str) -> str:
     """Return *text* with undecodable bytes shown as escapes.
 
-    A name from _decode_ref may carry surrogates, which a strict UTF-8
-    stdout refuses to encode; messages must survive printing it.
+    A name from _decode_ref may carry surrogates, which a strict UTF-8 stdout refuses to encode;
+    messages must survive printing it.
     """
     raw = text.encode("utf-8", "surrogateescape")
     return raw.decode("utf-8", "backslashreplace")
 
 
 def _looks_like_sha(revision: str) -> bool:
-    # Any hex string up to full SHA length may be a commit id; 64
-    # covers SHA-256 repositories. This deliberately mistakes short
-    # all-hex branch names for SHAs, the cost of which is only a wider
-    # fetch refspec: _fetch() resolves such a name through its scratch
-    # ref.
+    # Any hex string up to full SHA length may be a commit id; 64 covers SHA-256 repositories. This
+    # deliberately mistakes short all-hex branch names for SHAs, the cost of which is only a wider
+    # fetch refspec: _fetch() resolves such a name through its scratch ref.
     if not revision or len(revision) > 64:
         return False
     return all(c in "0123456789abcdefABCDEF" for c in revision)
@@ -146,7 +139,7 @@ class Update(MemberCommand):
             "-k",
             "--keep-descendants",
             action="store_true",
-            help="keep a checked-out branch if it descends from the " "manifest revision",
+            help="keep a checked-out branch if it descends from the manifest revision",
         )
         parser.add_argument(
             "-r",
@@ -192,7 +185,7 @@ class Update(MemberCommand):
         if configured is None:
             return "smart"
         if configured not in ("smart", "always"):
-            self.wrn(f'ignoring invalid update.fetch value "{configured}"; ' 'using "smart"')
+            self.wrn(f'ignoring invalid update.fetch value "{configured}"; using "smart"')
             return "smart"
         return configured
 
@@ -204,9 +197,12 @@ class Update(MemberCommand):
                 if not item:
                     continue
                 if item[0] not in "+-":
-                    self.die(f'invalid --group-filter item "{item}"; it must ' 'begin with "+" or "-"')
+                    self.die(f'invalid --group-filter item "{item}"; it must begin with "+" or "-"')
                 if not is_group(item[1:]):
-                    self.die(f'invalid --group-filter item "{item}"; ' f'"{item[1:]}" is an invalid group name')
+                    self.die(
+                        f'invalid --group-filter item "{item}"; '
+                        f'"{item[1:]}" is an invalid group name'
+                    )
                 entries.append(item)
         return entries
 
@@ -237,8 +233,8 @@ class Update(MemberCommand):
             except subprocess.CalledProcessError:
                 failed.append(member)
             except OSError as err:
-                # E.g. the member's path is occupied by a plain file, or
-                # a permission problem; this must not become a traceback.
+                # E.g. the member's path is occupied by a plain file, or a permission problem; this
+                # must not become a traceback.
                 self.err(f"cannot update {member.name_and_path}: {err}")
                 failed.append(member)
         self._finish(manifest, failed)
@@ -247,10 +243,9 @@ class Update(MemberCommand):
         if failed:
             names = ", ".join(m.name_and_path for m in failed)
             self.err(f"update failed for: {names}")
-        # Also on partial failure: the members that did move are part of
-        # the on-disk state, and the generated files must describe it or
-        # the CMake guard hash keeps blessing caches that no longer
-        # match the repospace.
+        # Also on partial failure: the members that did move are part of the on-disk state, and the
+        # generated files must describe it or the CMake guard hash keeps blessing caches that no
+        # longer match the repospace.
         self._generate(manifest)
         if failed:
             raise CommandError(1)
@@ -266,14 +261,12 @@ class Update(MemberCommand):
     # -- restricted update -------------------------------------------------
 
     def _update_some(self, args):
-        # Requested names must resolve against the full manifest when
-        # possible: a name may be defined more than once across the
-        # import graph with only the first definition winning, and a
-        # partial resolution can pick a shadowed definition (and so a
-        # different revision). Before the members providing import data
-        # are updated, full resolution may be impossible; fall back to
-        # resolving without member imports, so members declared in the
-        # manifest repository itself can still be updated first.
+        # Requested names must resolve against the full manifest when possible: a name may be
+        # defined more than once across the import graph with only the first definition winning, and
+        # a partial resolution can pick a shadowed definition (and so a different revision). Before
+        # the members providing import data are updated, full resolution may be impossible; fall
+        # back to resolving without member imports, so members declared in the manifest repository
+        # itself can still be updated first.
         full_error = None
         try:
             manifest = Manifest.from_topdir(self.topdir)
@@ -296,9 +289,8 @@ class Update(MemberCommand):
                 )
             self.die(f"unknown member(s): {unknown}")
         self.manifest = manifest
-        # Before anything is updated: rejecting this from inside the
-        # loop would leave the earlier names already fetched and moved,
-        # with no chance to record them.
+        # Before anything is updated: rejecting this from inside the loop would leave the earlier
+        # names already fetched and moved, with no chance to record them.
         if any(isinstance(member, ManifestMember) for member in members):
             self.die("the manifest repository cannot be updated")
 
@@ -314,8 +306,8 @@ class Update(MemberCommand):
         if failed:
             names = ", ".join(m.name_and_path for m in failed)
             self.err(f"update failed for: {names}")
-        # Regenerate repospace files from a full resolution if possible,
-        # on partial failure too: see _finish().
+        # Regenerate repospace files from a full resolution if possible, on partial failure too: see
+        # _finish().
         try:
             full = Manifest.from_topdir(self.topdir)
         except Exception:
@@ -331,31 +323,35 @@ class Update(MemberCommand):
     # -- the importer callback --------------------------------------------
 
     def update_importer(self, member, path):
-        # Only regular members reach here: self-imports from the
-        # manifest repository are read from its filesystem, never
-        # through the importer.
+        # Only regular members reach here: self-imports from the manifest repository are read from
+        # its filesystem, never through the importer.
         if member.name not in self.updated:
-            # The manifest layer guarantees groups+import never combine,
-            # so there is no activity question to answer here. A member
-            # already updated this run is not updated again: resolving
-            # its manifest plus its self-imports takes several reads.
+            # The manifest layer guarantees groups+import never combine, so there is no activity
+            # question to answer here. A member already updated this run is not updated again:
+            # resolving its manifest plus its self-imports takes several reads.
             try:
                 self.update_one(member)
             except subprocess.CalledProcessError:
-                # Resolution cannot continue without this member's
-                # manifest data, so there is nothing to aggregate.
-                self.die("cannot resolve the manifest: update failed for " f"imported member {member.name_and_path}")
-            except OSError as err:
-                # Unlike the git failure above, nothing was printed
-                # for this yet; include the cause.
+                # Resolution cannot continue without this member's manifest data, so there is
+                # nothing to aggregate.
                 self.die(
-                    "cannot resolve the manifest: update failed for " f"imported member {member.name_and_path}: {err}"
+                    "cannot resolve the manifest: update failed for "
+                    f"imported member {member.name_and_path}"
+                )
+            except OSError as err:
+                # Unlike the git failure above, nothing was printed for this yet; include the cause.
+                self.die(
+                    "cannot resolve the manifest: update failed for "
+                    f"imported member {member.name_and_path}: {err}"
                 )
         self.updated.add(member.name)
         try:
             return member_manifest_content(member, path)
         except FileNotFoundError:
-            self.die(f"can't import from member {member.name}: {path} not " f"found at {QUAL_MANIFEST_REV}")
+            self.die(
+                f"can't import from member {member.name}: {path} not "
+                f"found at {QUAL_MANIFEST_REV}"
+            )
         except subprocess.CalledProcessError:
             self.die(
                 f"can't import from member {member.name}: no "
@@ -378,8 +374,11 @@ class Update(MemberCommand):
 
         revision = member.revision
         try:
-            if self.fetch_strategy == "smart" and self._rev_type(member, revision) in ("tag", "commit"):
-                self.dbg(f"{member.name}: {revision} is available locally; " "skipping fetch")
+            if self.fetch_strategy == "smart" and self._rev_type(member, revision) in (
+                "tag",
+                "commit",
+            ):
+                self.dbg(f"{member.name}: {revision} is available locally; skipping fetch")
                 sha = member.sha(revision)
             else:
                 sha = self._fetch(member)
@@ -393,9 +392,8 @@ class Update(MemberCommand):
                 ]
             )
         finally:
-            # Cleaned even when the fetch or update-ref fails: a stale
-            # scratch ref would shadow a same-named revision in a later
-            # update (_fetch prefers the scratch ref).
+            # Cleaned even when the fetch or update-ref fails: a stale scratch ref would shadow a
+            # same-named revision in a later update (_fetch prefers the scratch ref).
             self._clean_scratch_refs(member)
         self._checkout(member, sha)
         if member.submodules:
@@ -406,13 +404,11 @@ class Update(MemberCommand):
             self.inf(f"{member.name}: updated in {elapsed:.2f} s")
 
     def _check_confined(self, member: Member):
-        # Member paths may not cross a symlink below the topdir, so no
-        # member (nor a symlink committed inside one) can redirect
-        # another member's directory. The manifest layer rejects this
-        # too, but it only sees the symlinks that exist when the
-        # manifest is loaded. Re-check just before touching the
-        # member's directory: an earlier clone in this very update may
-        # have created the symlink.
+        # Member paths may not cross a symlink below the topdir, so no member (nor a symlink
+        # committed inside one) can redirect another member's directory. The manifest layer rejects
+        # this too, but it only sees the symlinks that exist when the manifest is loaded. Re-check
+        # just before touching the member's directory: an earlier clone in this very update may have
+        # created the symlink.
         link = _symlink_below_topdir(self.topdir, member.path)
         if link is not None:
             self.die(
@@ -426,19 +422,18 @@ class Update(MemberCommand):
         os.makedirs(member.abspath, exist_ok=True)
         init = ["init", "-q"]
         if git_version() >= (2, 28):
-            # A placeholder branch name silences init.defaultBranch
-            # advice; it never gets a commit and is never used.
+            # A placeholder branch name silences init.defaultBranch advice; it never gets a commit
+            # and is never used.
             init += ["--initial-branch", _INIT_PLACEHOLDER_BRANCH]
         member.git(init)
         member.git(["remote", "add", "--", member.remote_name, member.url])
 
     def _sync_remote(self, member: Member):
-        # The manifest says where a member comes from, and fetches use
-        # its URL directly; the "origin" remote (repospace's own, see
-        # _initialize) must follow a URL change too, or "git fetch
-        # origin" inside the member keeps using the old location. The
-        # raw configured value is compared, not "remote get-url", which
-        # expands insteadOf rewrites and would mismatch on every update.
+        # The manifest says where a member comes from, and fetches use its URL directly; the
+        # "origin" remote (repospace's own, see _initialize) must follow a URL change too, or "git
+        # fetch origin" inside the member keeps using the old location. The raw configured value is
+        # compared, not "remote get-url", which expands insteadOf rewrites and would mismatch on
+        # every update.
         result = member.git(
             ["config", "--get", f"remote.{member.remote_name}.url"],
             check=False,
@@ -452,15 +447,16 @@ class Update(MemberCommand):
         else:
             # A clone made by hand may lack the remote altogether.
             member.git(["remote", "add", "--", member.remote_name, member.url])
-        self.small_banner(f'{member.name}: remote "{member.remote_name}" now points at {member.url}')
+        self.small_banner(
+            f'{member.name}: remote "{member.remote_name}" now points at {member.url}'
+        )
 
     def _detach_from_manifest_rev(self, member: Member):
-        # update-ref moves repospace-rev underneath an attached HEAD: the
-        # checkout that follows then finds HEAD already at the new commit
-        # and leaves the index and working tree at the old one. The
-        # branch is repospace's own, so unlike a user branch it is never
-        # kept (-k) or rebased (-r): HEAD is detached from it where it
-        # stands, and the usual checkout takes over from there.
+        # update-ref moves repospace-rev underneath an attached HEAD: the checkout that follows then
+        # finds HEAD already at the new commit and leaves the index and working tree at the old one.
+        # The branch is repospace's own, so unlike a user branch it is never kept (-k) or rebased
+        # (-r): HEAD is detached from it where it stands, and the usual checkout takes over from
+        # there.
         result = member.git(
             ["symbolic-ref", "-q", "HEAD"],
             check=False,
@@ -472,9 +468,8 @@ class Update(MemberCommand):
         if self._head_ok(member):
             member.git(["checkout", "-q", "--detach"])
         else:
-            # Unborn (e.g. "git checkout --orphan repospace-rev"): there
-            # is no commit to detach at; park HEAD on the placeholder
-            # branch instead, as a fresh repository starts out.
+            # Unborn (e.g. "git checkout --orphan repospace-rev"): there is no commit to detach at;
+            # park HEAD on the placeholder branch instead, as a fresh repository starts out.
             member.git(["symbolic-ref", "HEAD", f"refs/heads/{_INIT_PLACEHOLDER_BRANCH}"])
         self.inf(f'{member.name}: detached HEAD from "{MANIFEST_REV}", which is owned by repospace')
 
@@ -512,16 +507,15 @@ class Update(MemberCommand):
 
     @property
     def _git_quiet(self):
-        # Below normal verbosity, silence the git subcommands that
-        # print progress on their own.
+        # Below normal verbosity, silence the git subcommands that print progress on their own.
         return ["-q"] if self.verbosity < Verbosity.INF else []
 
     def _fetch(self, member: Member) -> str:
         revision = member.revision
         sha_like = _looks_like_sha(revision) and not self.narrow
         if sha_like:
-            # Many servers refuse to serve a bare SHA; fetch all branch
-            # tips into a scratch namespace and hope it is reachable.
+            # Many servers refuse to serve a bare SHA; fetch all branch tips into a scratch
+            # namespace and hope it is reachable.
             refspec = f"refs/heads/*:{QUAL_REFS}*"
         else:
             refspec = revision
@@ -535,10 +529,8 @@ class Update(MemberCommand):
         self.small_banner(f"{member.name}: fetching, need revision {revision}")
         member.git(fetch)
         if sha_like:
-            # An all-hex branch name misdetected as a SHA is not an
-            # object id, but its tip was just fetched into the scratch
-            # namespace; prefer the ref, as git does for ambiguous
-            # names.
+            # An all-hex branch name misdetected as a SHA is not an object id, but its tip was just
+            # fetched into the scratch namespace; prefer the ref, as git does for ambiguous names.
             for candidate in (f"{QUAL_REFS}{revision}", revision):
                 result = member.git(
                     ["rev-parse", f"{candidate}^{{commit}}"],
@@ -554,14 +546,13 @@ class Update(MemberCommand):
                 "branch on the remote"
             )
             raise subprocess.CalledProcessError(result.returncode, result.args)
-        # The two-step peel avoids "not a valid object name" for
-        # annotated tags, which cannot be peeled inside a refspec.
+        # The two-step peel avoids "not a valid object name" for annotated tags, which cannot be
+        # peeled inside a refspec.
         return member.sha("FETCH_HEAD")
 
     def _clean_scratch_refs(self, member: Member):
-        # Best-effort: this also runs while an exception unwinds, and a
-        # cleanup failure must not mask it; anything left over is
-        # removed by the next update of the same member.
+        # Best-effort: this also runs while an exception unwinds, and a cleanup failure must not
+        # mask it; anything left over is removed by the next update of the same member.
         listing = member.git(
             ["for-each-ref", "--format", "%(refname)", QUAL_REFS],
             check=False,
@@ -570,10 +561,9 @@ class Update(MemberCommand):
         )
         if listing.returncode != 0:
             return
-        # Scratch refs mirror the remote's branch names, which are not
-        # necessarily valid UTF-8; decoding as os.fsdecode does keeps
-        # the bytes intact, so the deletion below names the very ref
-        # that was listed.
+        # Scratch refs mirror the remote's branch names, which are not necessarily valid UTF-8;
+        # decoding as os.fsdecode does keeps the bytes intact, so the deletion below names the very
+        # ref that was listed.
         for ref in os.fsdecode(listing.stdout).splitlines():
             if ref:
                 member.git(
@@ -598,14 +588,13 @@ class Update(MemberCommand):
                 capture_stdout=True,
             ).stdout
         )
-        # "HEAD" is what git prints for a detached HEAD; it prints
-        # nothing at all when a ref named HEAD (e.g. a tag) makes the
-        # name ambiguous, which is a detached HEAD just the same.
+        # "HEAD" is what git prints for a detached HEAD; it prints nothing at all when a ref named
+        # HEAD (e.g. a tag) makes the name ambiguous, which is a detached HEAD just the same.
         detached = branch in ("HEAD", "")
         shown = _printable(branch)
 
         if not detached and self.args.keep_descendants and (member.is_ancestor_of(sha, branch)):
-            self.small_banner(f"{member.name}: left descendant branch " f'"{shown}" checked out')
+            self.small_banner(f'{member.name}: left descendant branch "{shown}" checked out')
             return
         if not detached and self.args.rebase:
             member.git(["rebase"] + self._git_quiet + [QUAL_MANIFEST_REV])
@@ -616,7 +605,10 @@ class Update(MemberCommand):
             return
         member.git(["checkout", "-q", "--detach", sha])
         if not detached:
-            self.inf(f'{member.name}: left branch "{shown}"; to switch back: ' f"git -C {member.path} checkout {shown}")
+            self.inf(
+                f'{member.name}: left branch "{shown}"; to switch back: '
+                f"git -C {member.path} checkout {shown}"
+            )
 
     def _update_submodules(self, member: Member):
         strategy = "--rebase" if self.args.rebase else "--checkout"

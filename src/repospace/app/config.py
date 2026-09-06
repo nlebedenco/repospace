@@ -10,9 +10,8 @@ from repospace.configuration import ConfigFile, MalformedConfig, parse_key
 _DESCRIPTION = """\
 Get and set repospace configuration options, named "section.key".
 
-Reads consult all three configuration files (system, global, local) with
-local winning; writes default to the local file. Use --system, --global,
-or --local to address one file explicitly.
+Reads consult all three configuration files (system, global, local) with local winning; writes
+default to the local file. Use --system, --global, or --local to address one file explicitly.
 """
 
 
@@ -32,7 +31,7 @@ class Config(RepospaceCommand):
             "-d",
             "--delete",
             action="store_true",
-            help="delete an option from the highest-precedence file " "where it is set",
+            help="delete an option from the highest-precedence file where it is set",
         )
         parser.add_argument(
             "-D",
@@ -94,8 +93,8 @@ class Config(RepospaceCommand):
 
         if args.delete or args.delete_all:
             if args.delete and args.delete_all:
-                # The two name different scopes; -D must not quietly
-                # widen the deletion the -d asked for.
+                # The two name different scopes; -D must not quietly widen the deletion the -d asked
+                # for.
                 self.parser.error("-d cannot be combined with -D")
             if args.value is not None:
                 self.parser.error("cannot combine a value with -d/-D")
@@ -126,7 +125,7 @@ class Config(RepospaceCommand):
         if args.append:
             existing = config.get(args.name, configfile=configfile)
             if existing is None:
-                self.die(f"-a: {args.name} is not set in the selected " "configuration file")
+                self.die(f"-a: {args.name} is not set in the selected configuration file")
             value = existing + value
         try:
             config.set(args.name, value, configfile=configfile)

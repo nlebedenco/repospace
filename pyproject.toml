@@ -56,7 +56,7 @@ testpaths = ["tests"]
 
 [tool.black]
 # Line length should match the setting in .editorconfig
-line-length = 120
+line-length = 100
 
 # Force exclude works like --exclude and --extended-exclude, but files and directories matching the
 # regex will be excluded even when they are passed explicitly as arguments. This is useful when
@@ -97,7 +97,7 @@ line-length = 120
 #
 #           Identified `/devel/myproject` as project root containing a .git directory.
 #           Using configuration from project root.
-#           line_length: 120
+#           line_length: 100
 #           force_exclude: (\.toml)|(/\.?external/.*)$
 #           bootstrap ignored: matches the --force-exclude regular expression
 #           external/foobar/scripts/make_bugs_pickle.py ignored: matches the --force-exclude regular expression

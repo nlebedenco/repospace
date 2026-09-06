@@ -24,9 +24,8 @@ class MemberCommand(RepospaceCommand):
     ) -> List[Member]:
         """Resolve the command's member arguments.
 
-        Naming members explicitly bypasses the group filter (and includes
-        the manifest repository if named). *unknown_hint* is appended to
-        the error for a name that is not a member.
+        Naming members explicitly bypasses the group filter (and includes the manifest repository if
+        named). *unknown_hint* is appended to the error for a name that is not a member.
         """
         manifest = self.manifest
         explicit = bool(getattr(args, "members", None))

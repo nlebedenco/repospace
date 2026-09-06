@@ -15,8 +15,8 @@ RESET = "\033[0m"
 def use_color(stream=None, color_ui: bool = True) -> bool:
     """Decide whether ANSI colors should be emitted on *stream*.
 
-    Colors are disabled by the color.ui configuration option, by the
-    NO_COLOR environment variable, or when the stream is not a terminal.
+    Colors are disabled by the color.ui configuration option, by the NO_COLOR environment variable,
+    or when the stream is not a terminal.
     """
     if not color_ui:
         return False
@@ -27,7 +27,6 @@ def use_color(stream=None, color_ui: bool = True) -> bool:
     try:
         return bool(stream.isatty())
     except (AttributeError, ValueError):
-        # No isatty(): not a terminal. ValueError: the stream is
-        # closed, which is not a terminal either — and deciding on a
-        # color is never worth failing an otherwise good command.
+        # No isatty(): not a terminal. ValueError: the stream is closed, which is not a terminal
+        # either — and deciding on a color is never worth failing an otherwise good command.
         return False

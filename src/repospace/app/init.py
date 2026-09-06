@@ -20,45 +20,35 @@ _USAGE = "%(prog)s [-h] [--manifest FILE] [REPOSITORY] [DIRECTORY] [-- GIT_OPTIO
 _DESCRIPTION = f"""\
 Create a repospace.
 
-REPOSITORY is a git URI (local or remote) representing the repository
-to be cloned. The repospace is created inside the clone, which must
-contain the manifest file. Local repositories must be expressed as a
-file:// URL rather than a plain path or they will be treated as
-pre-existing local folders for in-place initialization — not a
-repository to be cloned. The clone will be placed at DIRECTORY if one
-is provided. Otherwise a destination directory will be computed by
-appending the manifest's "self: name:" to the current working
-directory. A missing self name defaults to the REPOSITORY basename
-without any .git suffix. In all cases the clone folder must be a
-non-existing or empty directory.
+REPOSITORY is a git URI (local or remote) representing the repository to be cloned. The repospace is
+created inside the clone, which must contain the manifest file. Local repositories must be expressed
+as a file:// URL rather than a plain path or they will be treated as pre-existing local folders for
+in-place initialization — not a repository to be cloned. The clone will be placed at DIRECTORY if
+one is provided. Otherwise a destination directory will be computed by appending the manifest's
+"self: name:" to the current working directory. A missing self name defaults to the REPOSITORY
+basename without any .git suffix. In all cases the clone folder must be a non-existing or empty
+directory.
 
-If REPOSITORY is omitted, DIRECTORY must instead point to a
-pre-existing local folder containing the manifest file. The repospace
-is created inside it and nothing is cloned. If both REPOSITORY and
-DIRECTORY are omitted the current working directory is used as the
-pre-existing local folder.
+If REPOSITORY is omitted, DIRECTORY must instead point to a pre-existing local folder containing the
+manifest file. The repospace is created inside it and nothing is cloned. If both REPOSITORY and
+DIRECTORY are omitted the current working directory is used as the pre-existing local folder.
 
-GIT_OPTIONS are passed to "git clone" directly. The clone's own
-positional arguments (<repository> and <directory>) are supplied by
-repospace and cannot be overridden. In addition "repospace -q init"
-and "repospace -v init" relay -q/--verbose to git clone. If REPOSITORY
-is omitted, GIT_OPTIONS are ignored with a warning.
+GIT_OPTIONS are passed to "git clone" directly. The clone's own positional arguments (<repository>
+and <directory>) are supplied by repospace and cannot be overridden. In addition "repospace -q init"
+and "repospace -v init" relay -q/--verbose to git clone. If REPOSITORY is omitted, GIT_OPTIONS are
+ignored with a warning.
 
-The manifest file defaults to {MANIFEST_FILE}. --manifest FILE selects
-another file, relative to the directory being initialized and recorded
-as the manifest.file option.
+The manifest file defaults to {MANIFEST_FILE}. --manifest FILE selects another file, relative to the
+directory being initialized and recorded as the manifest.file option.
 
 positional arguments:
-  REPOSITORY        git repository to clone, remote or local; a local one
-                    must be a file:// URL, since a plain existing path is
-                    taken as an existing directory for in-place
+  REPOSITORY        git repository to clone, remote or local; a local one must be a file:// URL,
+                    since a plain existing path is taken as an existing directory for in-place
                     initialization
-  DIRECTORY         where the manifest file is looked up and the repospace
-                    is created: an existing directory (default: .) without
-                    REPOSITORY, else the clone destination (default:
+  DIRECTORY         where the manifest file is looked up and the repospace is created: an existing
+                    directory (default: .) without REPOSITORY, else the clone destination (default:
                     self:name, else the REPOSITORY basename without .git)
-  -- GIT_OPTIONS    options passed to git clone; can only appear when
-                    REPOSITORY is provided
+  -- GIT_OPTIONS    options passed to git clone; can only appear when REPOSITORY is provided
 """
 
 
@@ -84,17 +74,16 @@ def _set_umask_mode(path: pathlib.Path) -> None:
     try:
         os.chmod(path, 0o777 & ~umask)
     except OSError:
-        # Being readable by other users (CI, build services) is a
-        # convenience; a filesystem without POSIX modes is not an error.
+        # Being readable by other users (CI, build services) is a convenience; a filesystem without
+        # POSIX modes is not an error.
         pass
 
 
 def _remove_contents(path: pathlib.Path) -> None:
     """Delete everything inside *path*, keeping the directory itself.
 
-    Used to undo a clone into a directory that was already there: the
-    directory's inode, mode, ownership and ACLs must survive, and other
-    processes may have it as their working directory.
+    Used to undo a clone into a directory that was already there: the directory's inode, mode,
+    ownership and ACLs must survive, and other processes may have it as their working directory.
     """
     try:
         entries = list(path.iterdir())
@@ -134,12 +123,11 @@ class Init(RepospaceCommand):
             f"initialized (default: {MANIFEST_FILE}); must be given "
             "before the positional arguments",
         )
-        # The general syntax is [REPOSITORY] [DIRECTORY] [-- GIT_OPTIONS],
-        # but the parser cannot mirror it: only the existing-directory
-        # test tells REPOSITORY and DIRECTORY apart, so one argument
-        # takes the first positional and a REMAINDER takes the rest.
-        # Their help entries are hand-written in _DESCRIPTION, one per
-        # syntax element, and the argparse entries are suppressed.
+        # The general syntax is [REPOSITORY] [DIRECTORY] [-- GIT_OPTIONS], but the parser cannot
+        # mirror it: only the existing-directory test tells REPOSITORY and DIRECTORY apart, so one
+        # argument takes the first positional and a REMAINDER takes the rest. Their help entries are
+        # hand-written in _DESCRIPTION, one per syntax element, and the argparse entries are
+        # suppressed.
         parser.add_argument(
             "location",
             nargs="?",
@@ -173,9 +161,8 @@ class Init(RepospaceCommand):
         location = args.location
         rest = list(args.rest)
         if location and location.startswith("-") and location != "-":
-            # argparse dropped the "--" of "init -- GIT_OPTIONS..." and
-            # made the first option the DIRECTORY|REPOSITORY positional;
-            # everything was options.
+            # argparse dropped the "--" of "init -- GIT_OPTIONS..." and made the first option the
+            # DIRECTORY|REPOSITORY positional; everything was options.
             rest = [location] + rest
             location = None
         location = location or "."
@@ -211,8 +198,8 @@ class Init(RepospaceCommand):
         try:
             rdir.mkdir()
         except FileExistsError:
-            # topdir() only recognizes a directory, so what exists here
-            # is something else (e.g. a file named .repospace).
+            # topdir() only recognizes a directory, so what exists here is something else (e.g. a
+            # file named .repospace).
             self.die(f"{rdir} exists and is not a directory")
         except OSError as err:
             self.die(f"cannot create {rdir}: {err}")
@@ -235,12 +222,11 @@ class Init(RepospaceCommand):
         if directory:
             dest = pathlib.Path(directory)
             preexisting = dest.exists()
-            # DIRECTORY can name a place outside the current directory,
-            # which was checked above; a repospace must not be nested in
-            # another one wherever the clone lands.
+            # DIRECTORY can name a place outside the current directory, which was checked above; a
+            # repospace must not be nested in another one wherever the clone lands.
             self._die_if_in_repospace(dest.resolve())
-            # Like git clone, an existing destination is acceptable only
-            # when it is an empty directory.
+            # Like git clone, an existing destination is acceptable only when it is an empty
+            # directory.
             if preexisting and not self._is_empty_dir(dest):
                 self.die(f"refusing to overwrite existing path: {dest}")
             self._clone(repository, git_options, str(dest))
@@ -248,13 +234,12 @@ class Init(RepospaceCommand):
             try:
                 self._check_clone(dest, mfile)
             except SystemExit:
-                # Do not leave a clone behind that cannot become a
-                # repospace; parent directories created by git are kept.
+                # Do not leave a clone behind that cannot become a repospace; parent directories
+                # created by git are kept.
                 if preexisting:
-                    # The destination existed (empty) before this run:
-                    # take the clone back out of it instead of deleting
-                    # the directory itself, which would substitute a new
-                    # one for the user's (DIRECTORY can be ".").
+                    # The destination existed (empty) before this run: take the clone back out of it
+                    # instead of deleting the directory itself, which would substitute a new one for
+                    # the user's (DIRECTORY can be ".").
                     _remove_contents(dest)
                 else:
                     shutil.rmtree(dest, ignore_errors=True)
@@ -271,9 +256,8 @@ class Init(RepospaceCommand):
                 dest = cwd / self._dest_name(repository, tmp, mfile)
                 preexisting = dest.exists()
                 if preexisting:
-                    # Like git clone, an existing destination is
-                    # acceptable only when it is an empty directory; the
-                    # rename below replaces it.
+                    # Like git clone, an existing destination is acceptable only when it is an empty
+                    # directory; the rename below replaces it.
                     if not self._is_empty_dir(dest):
                         self.die(f"refusing to overwrite existing path: {dest}")
                     try:
@@ -284,19 +268,16 @@ class Init(RepospaceCommand):
                     os.rename(tmp, dest)
                 except OSError as err:
                     if preexisting:
-                        # Put back the empty directory removed just
-                        # above, so a failed run leaves the destination
-                        # as it was found.
+                        # Put back the empty directory removed just above, so a failed run leaves
+                        # the destination as it was found.
                         try:
                             dest.mkdir(exist_ok=True)
                         except OSError:
-                            # The rename error below is the one worth
-                            # reporting.
+                            # The rename error below is the one worth reporting.
                             pass
                     self.die(f"cannot move the clone to {dest}: {err}")
-                # mkdtemp made the directory 0700 for its own sake; the
-                # repospace root gets ordinary permissions instead, so
-                # that other users (CI, build services) can reach it.
+                # mkdtemp made the directory 0700 for its own sake; the repospace root gets ordinary
+                # permissions instead, so that other users (CI, build services) can reach it.
                 _set_umask_mode(dest)
             finally:
                 # Gone already if the rename above succeeded.
@@ -314,8 +295,7 @@ class Init(RepospaceCommand):
 
     def _clone(self, repository: str, git_options, dest: str):
         self.small_banner(f"Cloning manifest repository from {repository}")
-        # Relay repospace verbosity; the user's options come after and
-        # win on conflict.
+        # Relay repospace verbosity; the user's options come after and win on conflict.
         options = []
         if self.verbosity < Verbosity.INF:
             options.append("-q")
@@ -344,5 +324,5 @@ class Init(RepospaceCommand):
             return parsed.yaml_name
         name = _clone_dir_name(repository)
         if not name or name in (".", "..", ".git", util.REPOSPACE_DIR):
-            self.die(f"cannot derive a directory name from {repository}; " "pass DIRECTORY explicitly")
+            self.die(f"cannot derive a directory name from {repository}; pass DIRECTORY explicitly")
         return name

@@ -9,17 +9,15 @@ repospace uses Git-style configuration at three levels:
            ~/.config); override with REPOSPACE_CONFIG_GLOBAL.
   LOCAL:   <topdir>/.repospace/config; override with REPOSPACE_CONFIG_LOCAL.
 
-Files are INI format. Options are named "section.key"; the name is split on
-the first dot only. Sections may contain letters, digits, "-" and "_";
-keys additionally allow ".". Like git config, section and key names are
-case-insensitive and normalized to lowercase. The INI "DEFAULT" section
-name is reserved (in any case): configparser would copy its keys into
-every section. A key present without a value reads as the empty string.
-Precedence is LOCAL > GLOBAL > SYSTEM.
+Files are INI format. Options are named "section.key"; the name is split on the first dot only.
+Sections may contain letters, digits, "-" and "_"; keys additionally allow ".". Like git config,
+section and key names are case-insensitive and normalized to lowercase. The INI "DEFAULT" section
+name is reserved (in any case): configparser would copy its keys into every section. A key present
+without a value reads as the empty string. Precedence is LOCAL > GLOBAL > SYSTEM.
 
-Writes take effect immediately with no concurrency protection; callers are
-responsible for mutual exclusion. Writes edit the file textually, touching
-only the affected option's lines, so comments and layout are preserved.
+Writes take effect immediately with no concurrency protection; callers are responsible for mutual
+exclusion. Writes edit the file textually, touching only the affected option's lines, so comments
+and layout are preserved.
 """
 
 from __future__ import annotations
@@ -60,11 +58,10 @@ class ConfigFile(enum.Enum):
     LOCAL = 4
 
 
-# Section and key names are written verbatim into INI files; characters
-# with INI syntax meaning ("=", ":", "#", ";", "[", whitespace, newlines)
-# would be reinterpreted on the next read as a different option, a
-# comment, or an injected line — possibly leaving the file unparseable,
-# which breaks every later invocation. Restrict names to a safe set.
+# Section and key names are written verbatim into INI files; characters with INI syntax meaning
+# ("=", ":", "#", ";", "[", whitespace, newlines) would be reinterpreted on the next read as a
+# different option, a comment, or an injected line — possibly leaving the file unparseable, which
+# breaks every later invocation. Restrict names to a safe set.
 _SECTION_RE = re.compile(r"[A-Za-z0-9_-]+\Z")
 _KEY_RE = re.compile(r"[A-Za-z0-9_.-]+\Z")
 
@@ -72,9 +69,8 @@ _KEY_RE = re.compile(r"[A-Za-z0-9_.-]+\Z")
 def _check_value(option: str, value: str) -> None:
     """Reject a value the file format cannot carry back unchanged.
 
-    Values are written verbatim, so two constructs would be read back
-    as something else entirely and are refused before anything is
-    written, like the name restrictions above:
+    Values are written verbatim, so two constructs would be read back as something else entirely and
+    are refused before anything is written, like the name restrictions above:
 
       - a carriage return, which universal-newline reading turns into a
         line break, truncating the value and injecting the rest of it
@@ -84,7 +80,8 @@ def _check_value(option: str, value: str) -> None:
     """
     if "\r" in value:
         raise MalformedConfig(
-            f'cannot set "{option}": the value contains a carriage ' "return, which would be read back as a line break"
+            f'cannot set "{option}": the value contains a carriage '
+            "return, which would be read back as a line break"
         )
     for line in value.split("\n")[1:]:
         stripped = line.strip()
@@ -99,10 +96,9 @@ def _check_value(option: str, value: str) -> None:
 def parse_key(option: str) -> Tuple[str, str]:
     """Split "section.key" on the first dot only.
 
-    Like git config, section and key names are case-insensitive; both
-    are returned lowercased. (configparser lowercases keys on its own,
-    but leaves section names case-sensitive; without normalization,
-    "Alias.up" would address a section no read ever consults.)
+    Like git config, section and key names are case-insensitive; both are returned lowercased.
+    (configparser lowercases keys on its own, but leaves section names case-sensitive; without
+    normalization, "Alias.up" would address a section no read ever consults.)
     """
     section, sep, key = option.partition(".")
     if not sep or not section or not key:
@@ -147,11 +143,10 @@ def _local_path(topdir: Optional[str]) -> Optional[str]:
     return os.path.join(topdir, util.REPOSPACE_DIR, "config")
 
 
-# Matches a section header on an already-stripped line. Like
-# configparser's SECTCRE, the name is everything up to the *last* "]",
-# so a hand-written "[a]x]" names the section "a]x" here as well; a
-# non-greedy match would edit options the reader attributes to another
-# section, writing values no read can find.
+# Matches a section header on an already-stripped line. Like configparser's SECTCRE, the name is
+# everything up to the *last* "]", so a hand-written "[a]x]" names the section "a]x" here as well; a
+# non-greedy match would edit options the reader attributes to another section, writing values no
+# read can find.
 _HEADER_RE = re.compile(r"\[(.+)\]")
 
 
@@ -172,9 +167,8 @@ def _option_key(line: str) -> Optional[str]:
 def _value_end(lines, start: int) -> int:
     """Index one past the value block of the option starting at *start*.
 
-    Continuation lines are indented; a blank line belongs to the value
-    only when further indented content follows (configparser's
-    empty_lines_in_values default). Leaving such lines behind would
+    Continuation lines are indented; a blank line belongs to the value only when further indented
+    content follows (configparser's empty_lines_in_values default). Leaving such lines behind would
     attach them to whatever replaces the option.
     """
     end = start + 1
@@ -197,22 +191,19 @@ def _value_end(lines, start: int) -> int:
 def _edited(text: str, section: str, key: str, value: Optional[str]) -> str:
     """Return *text* with section.key set to *value* (deleted if None).
 
-    The edit is textual and touches only the option's own lines, so
-    comments, blank lines, and the rest of the layout survive —
-    ConfigParser.write() would re-serialize from parsed data and drop
-    every comment in the file. Section and key matching is
-    case-insensitive, mirroring how reads merge the file.
+    The edit is textual and touches only the option's own lines, so comments, blank lines, and the
+    rest of the layout survive — ConfigParser.write() would re-serialize from parsed data and drop
+    every comment in the file. Section and key matching is case-insensitive, mirroring how reads
+    merge the file.
     """
-    # Split on "\n" only: str.splitlines() also breaks on "\x0b",
-    # "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028" and "\u2029",
-    # and rejoining with "\n" would promote every one of them to a real
-    # line break — corrupting values this edit never touched. Reading
-    # translates "\r\n" and "\r" to "\n" already, so "\n" is the only
-    # boundary left in *text*.
+    # Split on "\n" only: str.splitlines() also breaks on "\x0b", "\x0c", "\x1c", "\x1d", "\x1e",
+    # "\x85", "\u2028" and "\u2029", and rejoining with "\n" would promote every one of them to a
+    # real line break — corrupting values this edit never touched. Reading translates "\r\n" and
+    # "\r" to "\n" already, so "\n" is the only boundary left in *text*.
     lines = text.split("\n")
     if lines and lines[-1] == "":
-        # A trailing newline ends the last line rather than starting an
-        # empty one; joined() puts it back.
+        # A trailing newline ends the last line rather than starting an empty one; joined() puts it
+        # back.
         lines.pop()
 
     def matching_spans():
@@ -238,9 +229,8 @@ def _edited(text: str, section: str, key: str, value: Optional[str]) -> str:
         return "\n".join(lines) + "\n" if lines else ""
 
     spans = matching_spans()
-    # The option's occurrences, as (start, end) line ranges. Sections
-    # differing only in case merge on read with the later definition
-    # winning, so the same key may occur more than once.
+    # The option's occurrences, as (start, end) line ranges. Sections differing only in case merge
+    # on read with the later definition winning, so the same key may occur more than once.
     found = []
     for start, stop in spans:
         index = start + 1
@@ -252,28 +242,25 @@ def _edited(text: str, section: str, key: str, value: Optional[str]) -> str:
                 index += 1
 
     if value is None:
-        # Delete every occurrence: removing only the last would
-        # resurrect an earlier, shadowed one.
+        # Delete every occurrence: removing only the last would resurrect an earlier, shadowed one.
         for start, end in reversed(found):
             del lines[start:end]
-        # Drop matching sections whose bodies are now all blank; a body
-        # that still holds comments keeps its header, so the comments
-        # keep their context.
+        # Drop matching sections whose bodies are now all blank; a body that still holds comments
+        # keeps its header, so the comments keep their context.
         for start, stop in reversed(matching_spans()):
             if all(not lines[i].strip() for i in range(start + 1, stop)):
                 del lines[start:stop]
         return joined()
 
-    # Same formatting as ConfigParser.write(), so the value reads back
-    # identically.
+    # Same formatting as ConfigParser.write(), so the value reads back identically.
     new = f"{key} = {value}".replace("\n", "\n\t").split("\n")
     if found:
         # Replace the last occurrence: on read, later definitions win.
         start, end = found[-1]
         lines[start:end] = new
     elif spans:
-        # Append inside the section, after its last non-blank line, so
-        # a blank separator before the next section stays where it is.
+        # Append inside the section, after its last non-blank line, so a blank separator before the
+        # next section stays where it is.
         start, stop = spans[-1]
         insert = start + 1
         for index in range(start + 1, stop):
@@ -291,9 +278,8 @@ def _edited(text: str, section: str, key: str, value: Optional[str]) -> str:
 def _replace_file(path: str, text: str) -> None:
     """Give *path* the contents *text* in a single step.
 
-    Written to a temporary file in the same directory and renamed over
-    the original, so an interrupted or failing write cannot leave a
-    truncated (or empty) configuration file behind.
+    Written to a temporary file in the same directory and renamed over the original, so an
+    interrupted or failing write cannot leave a truncated (or empty) configuration file behind.
     """
     fd, tmp = tempfile.mkstemp(
         dir=os.path.dirname(path) or ".",
@@ -305,9 +291,8 @@ def _replace_file(path: str, text: str) -> None:
         try:
             mode = os.stat(path).st_mode & 0o777
         except FileNotFoundError:
-            # mkstemp creates the file 0600; a configuration file
-            # created here gets ordinary umask-based permissions
-            # instead, as an ordinary write would.
+            # mkstemp creates the file 0600; a configuration file created here gets ordinary
+            # umask-based permissions instead, as an ordinary write would.
             umask = os.umask(0)
             os.umask(umask)
             mode = 0o666 & ~umask
@@ -321,8 +306,8 @@ def _replace_file(path: str, text: str) -> None:
 class Configuration:
     """Read and write repospace configuration options.
 
-    File locations are resolved at construction time; environment variable
-    changes after that are not observed by this instance.
+    File locations are resolved at construction time; environment variable changes after that are
+    not observed by this instance.
     """
 
     def __init__(self, topdir: Optional[str] = None):
@@ -339,14 +324,13 @@ class Configuration:
         }
         self._parsers = {}
         for level, path in self._paths.items():
-            # No interpolation: "%" is an ordinary character in values
-            # (git format strings in aliases, URL-encoded strings, ...).
+            # No interpolation: "%" is an ordinary character in values (git format strings in
+            # aliases, URL-encoded strings, ...).
             parser = configparser.ConfigParser(allow_no_value=True, interpolation=None)
             if path is not None and os.path.isfile(path):
-                # Not parser.read(), which silently skips files it
-                # cannot open: a configuration the user believes is in
-                # effect (e.g. unreadable due to permissions) must not
-                # be dropped without a diagnostic.
+                # Not parser.read(), which silently skips files it cannot open: a configuration the
+                # user believes is in effect (e.g. unreadable due to permissions) must not be
+                # dropped without a diagnostic.
                 raw = configparser.ConfigParser(allow_no_value=True, interpolation=None)
                 try:
                     with open(path, encoding="utf-8") as f:
@@ -354,37 +338,34 @@ class Configuration:
                 except OSError as err:
                     raise MalformedConfig(f"cannot read configuration file: {err}")
                 except UnicodeDecodeError as err:
-                    raise MalformedConfig(f"configuration file is not valid UTF-8: " f"{path}: {err}")
+                    raise MalformedConfig(f"configuration file is not valid UTF-8: {path}: {err}")
                 except configparser.Error as err:
                     raise MalformedConfig(f"cannot parse configuration file: {err}")
                 except AttributeError:
-                    # configparser's own failure mode for an indented
-                    # (continuation) line under an option that has no
-                    # value: with allow_no_value the option holds None,
-                    # and the reader appends to it. A parse error like
-                    # the others, not a traceback out of every command.
+                    # configparser's own failure mode for an indented (continuation) line under an
+                    # option that has no value: with allow_no_value the option holds None, and the
+                    # reader appends to it. A parse error like the others, not a traceback out of
+                    # every command.
                     raise MalformedConfig(
                         f"cannot parse configuration file: {path}: a "
                         "continuation line follows an option without a value"
                     )
-                # The DEFAULT section name is reserved, in any case:
-                # configparser copies its keys into every section on
-                # read, which is why set() refuses to write it. Reject
-                # it on read too — a leak-then-materialize would
-                # otherwise duplicate the keys into every section the
-                # next time the file is written.
+                # The DEFAULT section name is reserved, in any case: configparser copies its keys
+                # into every section on read, which is why set() refuses to write it. Reject it on
+                # read too — a leak-then-materialize would otherwise duplicate the keys into every
+                # section the next time the file is written.
                 if raw.defaults() or any(
-                    section.lower() == configparser.DEFAULTSECT.lower() for section in raw.sections()
+                    section.lower() == configparser.DEFAULTSECT.lower()
+                    for section in raw.sections()
                 ):
                     raise MalformedConfig(
                         f"cannot use configuration file: {path}: the "
                         f'section name "{configparser.DEFAULTSECT}" is '
                         "reserved (in any case); rename the section"
                     )
-                # Git-style case-insensitivity: section names are
-                # lowercased (configparser already lowercases keys),
-                # and sections differing only by case merge, later
-                # definitions winning — as git config reads them.
+                # Git-style case-insensitivity: section names are lowercased (configparser already
+                # lowercases keys), and sections differing only by case merge, later definitions
+                # winning — as git config reads them.
                 merged: dict = {}
                 for section in raw.sections():
                     merged.setdefault(section.lower(), {}).update(raw.items(section))
@@ -403,8 +384,8 @@ class Configuration:
             parser = self._parsers[level]
             if parser.has_option(section, key):
                 value = parser.get(section, key)
-                # allow_no_value: a key without "=" reads as None;
-                # report it as set-but-empty, not as unset.
+                # allow_no_value: a key without "=" reads as None; report it as set-but-empty, not
+                # as unset.
                 return "" if value is None else value
         return None
 
@@ -413,7 +394,9 @@ class Configuration:
         value = self._raw_get(section, key, configfile)
         return default if value is None else value
 
-    def getboolean(self, option: str, default: Any = None, configfile: ConfigFile = ConfigFile.ALL) -> Any:
+    def getboolean(
+        self, option: str, default: Any = None, configfile: ConfigFile = ConfigFile.ALL
+    ) -> Any:
         value = self.get(option, None, configfile)
         if value is None:
             return default
@@ -422,7 +405,9 @@ class Configuration:
             raise MalformedConfig(f'"{option}" is not a boolean: "{value}"')
         return state
 
-    def getint(self, option: str, default: Any = None, configfile: ConfigFile = ConfigFile.ALL) -> Any:
+    def getint(
+        self, option: str, default: Any = None, configfile: ConfigFile = ConfigFile.ALL
+    ) -> Any:
         value = self.get(option, None, configfile)
         if value is None:
             return default
@@ -431,7 +416,9 @@ class Configuration:
         except ValueError:
             raise MalformedConfig(f'"{option}" is not an integer: "{value}"')
 
-    def getfloat(self, option: str, default: Any = None, configfile: ConfigFile = ConfigFile.ALL) -> Any:
+    def getfloat(
+        self, option: str, default: Any = None, configfile: ConfigFile = ConfigFile.ALL
+    ) -> Any:
         value = self.get(option, None, configfile)
         if value is None:
             return default
@@ -445,22 +432,22 @@ class Configuration:
             raise ValueError("set() requires a specific configuration file")
         section, key = parse_key(option)
         if section == configparser.DEFAULTSECT.lower():
-            # Reserved by configparser in any case (names are
-            # lowercased): "[DEFAULT]" keys would leak into every
-            # section on the next read.
+            # Reserved by configparser in any case (names are lowercased): "[DEFAULT]" keys would
+            # leak into every section on the next read.
             raise MalformedConfig(
-                f'cannot set "{option}": the section name ' f'"{configparser.DEFAULTSECT}" is reserved'
+                f'cannot set "{option}": the section name '
+                f'"{configparser.DEFAULTSECT}" is reserved'
             )
         _check_value(option, str(value))
-        # Stored as configparser reads it back: surrounding whitespace
-        # on each line and trailing blank lines do not survive the
-        # file, so keeping them in memory would make get() answer
+        # Stored as configparser reads it back: surrounding whitespace on each line and trailing
+        # blank lines do not survive the file, so keeping them in memory would make get() answer
         # differently in this process than in the next one.
         value = "\n".join(line.strip() for line in str(value).split("\n")).rstrip()
         path = self._paths[configfile]
         if path is None:
             raise MalformedConfig(
-                "local configuration file location unknown; run inside a " "repospace or set REPOSPACE_CONFIG_LOCAL"
+                "local configuration file location unknown; run inside a "
+                "repospace or set REPOSPACE_CONFIG_LOCAL"
             )
         parser = self._parsers[configfile]
         try:
@@ -474,9 +461,9 @@ class Configuration:
     def delete(self, option: str, configfile: Optional[ConfigFile] = None) -> None:
         """Delete *option*.
 
-        With configfile=None, delete from the highest-precedence file where
-        it is set. With ConfigFile.ALL, delete from every file where it is
-        set. Raise KeyError if the option is not set anywhere applicable.
+        With configfile=None, delete from the highest-precedence file where it is set. With
+        ConfigFile.ALL, delete from every file where it is set. Raise KeyError if the option is not
+        set anywhere applicable.
         """
         section, key = parse_key(option)
         if configfile is None:
@@ -518,15 +505,17 @@ class Configuration:
                 result.append((f"{section}.{key}", "" if value is None else value))
         return result
 
-    def _edit_file(self, configfile: ConfigFile, section: str, key: str, value: Optional[str]) -> None:
+    def _edit_file(
+        self, configfile: ConfigFile, section: str, key: str, value: Optional[str]
+    ) -> None:
         """Set or delete one option in the file, preserving comments.
 
-        The file is re-read and edited textually rather than rewritten
-        from the in-memory parser, which would drop every comment.
+        The file is re-read and edited textually rather than rewritten from the in-memory parser,
+        which would drop every comment.
         """
         path = self._paths[configfile]
-        # Wrapped like the read in __init__: a permission problem or
-        # full disk must not become a traceback.
+        # Wrapped like the read in __init__: a permission problem or full disk must not become a
+        # traceback.
         try:
             pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
             try:
@@ -534,10 +523,9 @@ class Configuration:
                     text = f.read()
             except FileNotFoundError:
                 text = ""
-            # The replacement is computed before anything is written,
-            # then swapped in whole: truncating the file first would
-            # leave the user with an empty configuration if the edit or
-            # the write failed part-way.
+            # The replacement is computed before anything is written, then swapped in whole:
+            # truncating the file first would leave the user with an empty configuration if the edit
+            # or the write failed part-way.
             _replace_file(path, _edited(text, section, key, value))
         except OSError as err:
             raise MalformedConfig(f"cannot write configuration file: {err}")

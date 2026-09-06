@@ -27,17 +27,20 @@
       }
     },
     {
-      // The python-envs extension selects an interpreter only at its own startup. On a fresh clone that happens before
-      // bootstrap has created .venv, and the extension offers no non-interactive command to re-run selection, so this
-      // task triggers it again after bootstrap.
+      // The python-envs extension selects an interpreter only at its own startup. On a fresh clone
+      // that happens before bootstrap has created .venv, and the extension offers no
+      // non-interactive command to re-run selection, so this task triggers it again after
+      // bootstrap.
       //
-      // A task cannot call an extension API directly; the only bridge is a command-type input variable, resolved when
-      // the task starts: ${input:selectVenv}. It runs pythonVenvSelect.select, a command registered by the select-venv
-      // startup macro (.vscode/macros/select-venv.js, loaded through macros.startupMacros in settings.json), which
-      // selects .venv via the python-envs extension API.
+      // A task cannot call an extension API directly; the only bridge is a command-type input
+      // variable, resolved when the task starts: ${input:selectVenv}. It runs
+      // pythonVenvSelect.select, a command registered by the select-venv startup macro
+      // (.vscode/macros/select-venv.js, loaded through macros.startupMacros in settings.json),
+      // which selects .venv via the python-envs extension API.
       //
-      // The command returns a string in every code path, because a command input that resolves to undefined is treated
-      // as a user cancellation and would cancel this task with a "Cancelled" notification.
+      // The command returns a string in every code path, because a command input that resolves to
+      // undefined is treated as a user cancellation and would cancel this task with a "Cancelled"
+      // notification.
       "label": "Project: Reselect Python Virtual Environment",
       "hide": true,
       "dependsOn": [

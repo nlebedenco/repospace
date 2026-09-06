@@ -46,8 +46,8 @@ def test_init_requires_manifest(tmp_path, run_repospace):
 
 
 def test_init_nonexistent_location_attempts_clone(tmp_path, run_repospace):
-    # A first argument that is not an existing directory is treated as
-    # a repository; here git clone fails.
+    # A first argument that is not an existing directory is treated as a repository; here git clone
+    # fails.
     code, out, err = run_repospace(["init", "ghost"], cwd=tmp_path)
     assert code != 0
     assert "does not exist" in err
@@ -66,8 +66,8 @@ def test_init_in_place_warns_about_git_options(topology, run_repospace):
 
 
 def test_init_in_place_warns_without_location(topology, run_repospace):
-    # "init -- OPTS" initializes the current directory in place; the
-    # options are ignored with a warning.
+    # "init -- OPTS" initializes the current directory in place; the options are ignored with a
+    # warning.
     code, out, err = run_repospace(["init", "--", "--branch", "x"], cwd=topology.app)
     assert code == 0, err
     assert (topology.app / ".repospace").is_dir()
@@ -102,8 +102,7 @@ def test_init_refuses_existing_repospace(topology, run_repospace):
 def test_init_writes_no_config(topology, run_repospace):
     code, out, err = run_repospace(["init"], cwd=topology.app)
     assert code == 0, err
-    # .repospace/ presence alone defines the repospace; no bootstrap
-    # configuration is needed.
+    # .repospace/ presence alone defines the repospace; no bootstrap configuration is needed.
     assert list((topology.app / ".repospace").iterdir()) == []
 
 
@@ -177,8 +176,8 @@ def test_clone_with_directory(topology, run_repospace, tmp_path):
 
 
 def test_clone_url_basename_fallback(topology, run_repospace, repos, tmp_path):
-    # A manifest without self:name clones to the URL basename, .git
-    # suffix stripped -- like git clone.
+    # A manifest without self:name clones to the URL basename, .git suffix stripped -- like git
+    # clone.
     plain = repos.create("plain-src", {"repospace.yaml": "manifest:\n"})
     bare = repos.bare_clone(plain)
     assert bare.name == "plain-src.git"
@@ -222,8 +221,8 @@ def test_clone_missing_alternate_manifest(topology, run_repospace, tmp_path):
 
 
 def test_clone_dir_name_git_dir_suffix():
-    # "host/foo/.git" names the foo repository, like git clone; a bare
-    # ".git" never becomes the destination directory.
+    # "host/foo/.git" names the foo repository, like git clone; a bare ".git" never becomes the
+    # destination directory.
     from repospace.app.init import _clone_dir_name
 
     assert _clone_dir_name("https://host/foo/.git") == "foo"
@@ -232,8 +231,8 @@ def test_clone_dir_name_git_dir_suffix():
 
 
 def test_clone_url_dotgit_directory_fallback(topology, run_repospace, repos, tmp_path):
-    # A URL whose basename is ".git" clones to the parent component,
-    # never to a ".git" directory in the cwd.
+    # A URL whose basename is ".git" clones to the parent component, never to a ".git" directory in
+    # the cwd.
     plain = repos.create("dotgit-src", {"repospace.yaml": "manifest:\n"})
     bare = repos.bare_clone(plain, name="proj/.git")
     fresh = tmp_path / "fresh"
@@ -245,8 +244,8 @@ def test_clone_url_dotgit_directory_fallback(topology, run_repospace, repos, tmp
 
 
 def test_clone_git_options_passthrough(topology, run_repospace, tmp_path):
-    # The marker is committed on the release branch only, so the clone
-    # can contain it only if --branch release actually reached git clone.
+    # The marker is committed on the release branch only, so the clone can contain it only if
+    # --branch release actually reached git clone.
     subprocess.run(["git", "-C", str(topology.app), "switch", "-q", "-c", "release"], check=True)
     topology.repos.commit(topology.app, {"marker.txt": "on-branch\n"}, "branch commit")
     subprocess.run(["git", "-C", str(topology.app), "switch", "-q", "main"], check=True)
@@ -354,8 +353,8 @@ def test_clone_inside_repospace_fails(topology, run_repospace):
 
 
 def test_clone_into_directory_inside_repospace_fails(topology, run_repospace, tmp_path):
-    # The check covers DIRECTORY too, not only the current directory:
-    # nothing may plant a repospace inside another one.
+    # The check covers DIRECTORY too, not only the current directory: nothing may plant a repospace
+    # inside another one.
     outer = tmp_path / "outer"
     (outer / ".repospace").mkdir(parents=True)
     fresh = tmp_path / "fresh"
@@ -373,8 +372,8 @@ def test_clone_into_directory_inside_repospace_fails(topology, run_repospace, tm
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX file modes")
 def test_clone_root_gets_umask_mode(topology, run_repospace, tmp_path):
-    # Without DIRECTORY the clone goes through a temporary directory
-    # that mkdtemp creates 0700; the repospace root must not keep that.
+    # Without DIRECTORY the clone goes through a temporary directory that mkdtemp creates 0700; the
+    # repospace root must not keep that.
     fresh = tmp_path / "fresh"
     fresh.mkdir()
     old = os.umask(0o022)
@@ -389,8 +388,8 @@ def test_clone_root_gets_umask_mode(topology, run_repospace, tmp_path):
 
 
 def test_clone_rename_failure_restores_empty_target(topology, run_repospace, tmp_path, monkeypatch):
-    # The pre-existing empty destination is removed just before the
-    # clone is renamed onto it; a failed rename must put it back.
+    # The pre-existing empty destination is removed just before the clone is renamed onto it; a
+    # failed rename must put it back.
     fresh = tmp_path / "fresh"
     (fresh / "app").mkdir(parents=True)
 
@@ -408,9 +407,8 @@ def test_clone_rename_failure_restores_empty_target(topology, run_repospace, tmp
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX file modes")
 def test_clone_failure_keeps_destination_directory(topology, run_repospace, repos, tmp_path):
-    # "init URL ." undoing itself must empty the current directory, not
-    # delete and recreate it: the inode other processes are sitting in,
-    # and its mode and ownership, have to survive.
+    # "init URL ." undoing itself must empty the current directory, not delete and recreate it: the
+    # inode other processes are sitting in, and its mode and ownership, have to survive.
     src = repos.create("no-manifest-here", {"README.md": "hi\n"})
     fresh = tmp_path / "fresh"
     fresh.mkdir()

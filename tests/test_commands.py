@@ -106,9 +106,8 @@ def test_color_ui_defaults_to_true_without_config():
 
 
 def test_bad_color_ui_falls_back_and_warns_once(capsys):
-    # A value getboolean rejects must not take down every invocation
-    # (including the "config -d" that would remove it); every output
-    # helper reads color_ui.
+    # A value getboolean rejects must not take down every invocation (including the "config -d" that
+    # would remove it); every output helper reads color_ui.
     command = make_command()
     command.config = BadColorConfig()
     assert command.color_ui is True
@@ -119,8 +118,8 @@ def test_bad_color_ui_falls_back_and_warns_once(capsys):
 
 
 def test_bad_color_ui_still_reports_the_real_error(capsys):
-    # die() colorizes too; raising there would replace the fatal error
-    # the user has to see with one about the color option.
+    # die() colorizes too; raising there would replace the fatal error the user has to see with one
+    # about the color option.
     command = make_command()
     command.config = BadColorConfig()
     with pytest.raises(SystemExit):
@@ -153,8 +152,7 @@ def test_inf_colorize_without_tty_prints_plain(capsys):
 
 
 def test_inf_flushes(monkeypatch):
-    # Unflushed, info output interleaves wrongly with child-process
-    # output when stdout is a pipe.
+    # Unflushed, info output interleaves wrongly with child-process output when stdout is a pipe.
     class Recorder:
         def __init__(self):
             self.flushed = False
@@ -179,9 +177,8 @@ def test_subprocess_helpers(tmp_path):
 
 
 def test_run_subprocess_defaults_to_bytes():
-    # No injected defaults: a default "errors" (or any text-mode
-    # trigger) would silently hand every caller str instead of the
-    # bytes subprocess.run returns.
+    # No injected defaults: a default "errors" (or any text-mode trigger) would silently hand every
+    # caller str instead of the bytes subprocess.run returns.
     command = make_command()
     result = command.run_subprocess([sys.executable, "-c", "print('hi')"], stdout=subprocess.PIPE)
     assert result.stdout == b"hi\n"

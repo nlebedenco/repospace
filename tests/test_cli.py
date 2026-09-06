@@ -242,9 +242,8 @@ def test_config_delete_scoped(run_repospace, tmp_path):
 
 
 def test_config_unwritable_directory_dies_cleanly(run_repospace, tmp_path):
-    # A failed configuration write must die cleanly. The write is
-    # atomic (temporary file in the same directory, then a rename), so
-    # it is the directory that has to be unwritable; a read-only
+    # A failed configuration write must die cleanly. The write is atomic (temporary file in the same
+    # directory, then a rename), so it is the directory that has to be unwritable; a read-only
     # configuration file does not stop it, just as for git config.
     ws = make_repospace(tmp_path)
     run_repospace(["config", "a.b", "1"], cwd=ws)
@@ -322,8 +321,8 @@ def test_empty_alias_fails(run_repospace, tmp_path):
 
 
 def test_empty_alias_listed_in_help(run_repospace, tmp_path):
-    # An empty expansion produces no help text; the alias must still
-    # appear in the listing rather than silently vanish.
+    # An empty expansion produces no help text; the alias must still appear in the listing rather
+    # than silently vanish.
     ws = make_repospace(tmp_path)
     run_repospace(["config", "alias.bad", ""], cwd=ws)
     code, out, err = run_repospace(["help"], cwd=ws)
@@ -332,9 +331,8 @@ def test_empty_alias_listed_in_help(run_repospace, tmp_path):
 
 
 def test_malformed_alias_warns_and_continues(run_repospace, tmp_path):
-    # An alias value shlex cannot parse (unbalanced quote) must not take
-    # down every invocation; other commands, including the config -d
-    # that removes it, keep working.
+    # An alias value shlex cannot parse (unbalanced quote) must not take down every invocation;
+    # other commands, including the config -d that removes it, keep working.
     ws = make_repospace(tmp_path)
     (ws / ".repospace" / "config").write_text('[alias]\nbad = "unclosed\n')
     code, out, err = run_repospace(["topdir"], cwd=ws)
@@ -346,8 +344,8 @@ def test_malformed_alias_warns_and_continues(run_repospace, tmp_path):
 
 
 def test_malformed_alias_warning_respects_quiet(run_repospace, tmp_path):
-    # Startup warnings follow the same threshold as command-level
-    # warnings: -qq and lower silence them.
+    # Startup warnings follow the same threshold as command-level warnings: -qq and lower silence
+    # them.
     ws = make_repospace(tmp_path)
     (ws / ".repospace" / "config").write_text('[alias]\nbad = "unclosed\n')
     code, out, err = run_repospace(["-qq", "topdir"], cwd=ws)
@@ -361,9 +359,8 @@ def test_malformed_alias_warning_respects_quiet(run_repospace, tmp_path):
 
 
 def test_invalid_config_group_filter_warns_once(run_repospace, tmp_path):
-    # Library warnings follow the CLI conventions: the WARNING prefix,
-    # emitted once (not once per grouped member or is_active call), and
-    # silenced by -qq like every other warning.
+    # Library warnings follow the CLI conventions: the WARNING prefix, emitted once (not once per
+    # grouped member or is_active call), and silenced by -qq like every other warning.
     ws = tmp_path / "ws"
     (ws / ".repospace").mkdir(parents=True)
     (ws / "repospace.yaml").write_text(
@@ -441,9 +438,8 @@ def test_manifest_error_deferred_for_config(run_repospace, tmp_path):
 
 
 def test_command_help_available_with_broken_manifest(run_repospace, tmp_path):
-    # Help is how a user finds the way out of a broken repospace, so
-    # "-h" is answered before the manifest is required -- unlike an
-    # actual run of the same command.
+    # Help is how a user finds the way out of a broken repospace, so "-h" is answered before the
+    # manifest is required -- unlike an actual run of the same command.
     ws = make_repospace(tmp_path)
     (ws / "repospace.yaml").write_text("manifest:\n  bogus: 1\n")
     for name in ("list", "diff", "status", "grep", "forall", "compare"):
@@ -487,8 +483,7 @@ def test_manifest_path_honors_out_file(run_repospace, tmp_path):
 
 
 def test_manifest_validate_rejects_out_file(run_repospace, tmp_path):
-    # --validate prints nothing, so -o has nothing to write; it is
-    # refused instead of ignored.
+    # --validate prints nothing, so -o has nothing to write; it is refused instead of ignored.
     ws = make_repospace(tmp_path)
     out_file = tmp_path / "nothing.txt"
     code, out, err = run_repospace(["manifest", "--validate", "-o", str(out_file)], cwd=ws)
@@ -505,8 +500,7 @@ def test_manifest_path_rejects_active_only(run_repospace, tmp_path):
 
 
 def test_list_sha_placeholder_is_not_padded(run_repospace, tmp_path):
-    # The placeholder must not carry the default layout's padding into
-    # a user format string.
+    # The placeholder must not carry the default layout's padding into a user format string.
     ws = make_repospace(tmp_path)
     code, out, err = run_repospace(["list", "-a", "-f", "[{sha}]"], cwd=ws)
     assert code == 0, err

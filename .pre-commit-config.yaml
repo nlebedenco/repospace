@@ -17,15 +17,14 @@ repos:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md] # preserve markdown hard linebreaks
         exclude: (\.patch)$
-        # Exclude .idea/*.xml files from the end-of-file-fixer because CLion keeps removing the final EOL in some.
+        # Exclude .idea/*.xml files from the end-of-file-fixer because CLion keeps removing the
+        # final EOL in some.
         # Exclude patch files as they are sensitive to whitespace
-        # Exclude .vscode/zephyr-ide.json because the Zephyr IDE extension constantly overwrites this file without a
-        # trailing EOL
       - id: end-of-file-fixer
-        exclude: (\.idea/.+\.xml|\.patch|\.vscode/zephyr-ide.json)$
-        # It's important that the mixed-line-ending checks comes AFTER end-of-file-fixer because the latter can only
-        # append LF - even on files supposed to use CRLF - so we have to rely on mixed-line-ending to fix cases when
-        # the file should end with a CRLF.
+        exclude: (\.idea/.+\.xml|\.patch)$
+        # It's important that the mixed-line-ending checks comes AFTER end-of-file-fixer because the
+        # latter can only append LF - even on files supposed to use CRLF - so we have to rely on
+        # mixed-line-ending to fix cases when the file should end with a CRLF.
       - id: mixed-line-ending
         args: [--fix=no]
         exclude: ^(.+\.patch)$
@@ -33,9 +32,11 @@ repos:
       - id: check-case-conflict
       - id: check-illegal-windows-names
       - id: check-shebang-scripts-are-executable
-        # Exclude Unicode data from checks-added-large-files because these text files may be as large as 2MB
+        # Exclude Unicode data from checks-added-large-files because these text files may be as
+        # large as 2MB
       - id: check-added-large-files
-        args: [--maxkb=2048] # if git-lfs is installed, lfs files will be skipped (requires git-lfs>=2.2.1)
+        # If git-lfs is installed, lfs files will be skipped (requires git-lfs>=2.2.1).
+        args: [--maxkb=2048]
       - id: fix-byte-order-marker
       - id: check-yaml
       - id: check-toml
@@ -49,39 +50,44 @@ repos:
         files: (\.vscode/.*\.json)$ # only .vscode/*.json files support comments
   - repo: local
     hooks:
-      # HACK: Restore the previous commit message backup (if exists) created if the last invocation of gitlint failed
+      # HACK: Restore the previous commit message backup (if exists) created if the last invocation
+      #       of gitlint failed
       - id: pre-commit-prepare
         name: pre-commit-prepare
         entry: scripts/gitlint/pre-commit-prepare.py
         language: script
         stages: [prepare-commit-msg]
-      # Must run (i.e. be declared) before pre-commit-gitlint below: pre-commit runs commit-msg-stage hooks in config
-      # order, and gitlint must see the trimmed message, not the raw one. If gitlint ran first, it would lint the
-      # message before trailing whitespace is trimmed, fail, and its wrapper would back up the untrimmed message for
-      # the next attempt - causing the same failure to repeat forever.
+      # Must run (i.e. be declared) before pre-commit-gitlint below: pre-commit runs
+      # commit-msg-stage hooks in config order, and gitlint must see the trimmed message, not the
+      # raw one. If gitlint ran first, it would lint the message before trailing whitespace is
+      # trimmed, fail, and its wrapper would back up the untrimmed message for the next attempt -
+      # causing the same failure to repeat forever.
       #
-      # The trimming is a script rather than "sed -i -E 's/[[:space:]]+$//'" so that it also works off Linux: a
-      # language:system entry is executed directly, without a shell, so sed has to be on PATH (it is not on a plain
-      # Windows box, which would then reject every commit), and BSD/macOS sed reads the -E after -i as the backup
-      # suffix instead of a flag, which leaves the message untrimmed and drops a stray backup file next to it.
+      # The trimming is a script rather than "sed -i -E 's/[[:space:]]+$//'" so that it also works
+      # off Linux: a language:system entry is executed directly, without a shell, so sed has to be
+      # on PATH (it is not on a plain Windows box, which would then reject every commit), and
+      # BSD/macOS sed reads the -E after -i as the backup suffix instead of a flag, which leaves the
+      # message untrimmed and drops a stray backup file next to it.
       - id: pre-commit-trim
         name: Trim trailing whitespace in commit message
         entry: scripts/gitlint/pre-commit-trim.py # commit-msg file is appended by pre-commit
         language: script
         stages: [commit-msg]
-      # Runs the gitlint installed in the python venv (gitlint-core is a dev dependency in pyproject.toml) through a
-      # wrapper that backs up the message when linting fails, so it can be restored by pre-commit-prepare in the next
-      # attempt. Like every other language:script/system hook here, this relies on the venv being on PATH.
+      # Runs the gitlint installed in the python venv (gitlint-core is a dev dependency in
+      # pyproject.toml) through a wrapper that backs up the message when linting fails, so it can be
+      # restored by pre-commit-prepare in the next attempt. Like every other language:script/system
+      # hook here, this relies on the venv being on PATH.
       - id: pre-commit-gitlint
         name: gitlint
         entry: scripts/gitlint/pre-commit-run.py # commit-msg file is appended by pre-commit
         language: script
         stages: [commit-msg]
-      # HACK: black's find_project_root() takes the common ancestor of ALL given sources, then walks up from there
-      #       looking for .git/pyproject.toml. With only the matched files as sources, that walk starts at each
-      #       file's own directory and can stop at a nested .git (e.g. a west-managed submodule) before reaching the
-      #       real repo root. Passing pyproject.toml (resolved against pre-commit's cwd, i.e. the repo root) as an
-      #       extra source pins the common ancestor there instead.
+      # HACK: black's find_project_root() takes the common ancestor of ALL given sources, then walks
+      #       up from there looking for .git/pyproject.toml. With only the matched files as sources,
+      #       that walk starts at each file's own directory and can stop at a nested .git (e.g. a
+      #       west-managed submodule) before reaching the real repo root. Passing pyproject.toml
+      #       (resolved against pre-commit's cwd, i.e. the repo root) as an extra source pins the
+      #       common ancestor there instead.
       - id: format-python
         name: format-python
         language: system

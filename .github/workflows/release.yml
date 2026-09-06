@@ -1,9 +1,11 @@
 # Build, test and publish a release to PyPI when a version tag is pushed.
 #
-# Publishing uses PyPI trusted publishing (OpenID Connect): no API token is stored in the repository. The pending
-# publisher registered on PyPI must name this file (release.yml) and the "pypi" environment used by the publish job.
+# Publishing uses PyPI trusted publishing (OpenID Connect): no API token is stored in the
+# repository. The pending publisher registered on PyPI must name this file (release.yml) and the
+# "pypi" environment used by the publish job.
 #
-# The tag must equal "v" + repospace.__version__ (src/repospace/__init__.py); the build job fails otherwise.
+# The tag must equal "v" + repospace.__version__ (src/repospace/__init__.py); the build job fails
+# otherwise.
 name: Release
 
 on:
@@ -66,8 +68,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      # The tests run against the built wheel, not the checkout: src/ is not on sys.path with the src layout, so
-      # "import repospace" resolves to the installed package.
+      # The tests run against the built wheel, not the checkout: src/ is not on sys.path with the
+      # src layout, so "import repospace" resolves to the installed package.
       - name: Install the wheel and pytest
         run: python -m pip install pytest dist/*.whl
       - name: Run the test suite

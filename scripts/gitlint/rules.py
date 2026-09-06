@@ -1,13 +1,14 @@
 """
-The classes below implement user-defined CommitRules. Commit rules are gitlint rules that act on the entire commit at
-once. Once the rules are discovered, gitlint will automatically take care of applying them to the entire commit. This
-happens exactly once per commit.
+The classes below implement user-defined CommitRules. Commit rules are gitlint rules that act on the
+entire commit at once. Once the rules are discovered, gitlint will automatically take care of
+applying them to the entire commit. This happens exactly once per commit.
 
-A CommitRule contrasts with a LineRule (see examples/my_line_rules.py) in that a commit rule is only applied once on an entire commit. This allows commit rules to implement more complex checks that span multiple lines and/or checks that
-should only be done once per gitlint run.
+A CommitRule contrasts with a LineRule (see examples/my_line_rules.py) in that a commit rule is only
+applied once on an entire commit. This allows commit rules to implement more complex checks that
+span multiple lines and/or checks that should only be done once per gitlint run.
 
-While every LineRule can be implemented as a CommitRule, it's usually easier and more concise to go with a LineRule if
-that fits your needs.
+While every LineRule can be implemented as a CommitRule, it's usually easier and more concise to go
+with a LineRule if that fits your needs.
 """
 
 from gitlint.rules import CommitRule, RuleViolation, CommitMessageTitle, LineRule, CommitMessageBody
@@ -23,14 +24,20 @@ class BodyMinLineCount(CommitRule):
     id = "UC6"
 
     # A rule MAY have an options_spec if its behavior should be configurable.
-    options_spec = [IntOption("min-line-count", 1, "Minimum body line count excluding Signed-off-by")]
+    options_spec = [
+        IntOption("min-line-count", 1, "Minimum body line count excluding Signed-off-by")
+    ]
 
     def validate(self, commit):
-        filtered = [x for x in commit.message.body if not x.lower().startswith("signed-off-by") and x != ""]
+        filtered = [
+            x for x in commit.message.body if not x.lower().startswith("signed-off-by") and x != ""
+        ]
         line_count = len(filtered)
         min_line_count = self.options["min-line-count"].value
         if line_count < min_line_count:
-            message = "Commit message body is empty, should at least have {} line(s).".format(min_line_count)
+            message = "Commit message body is empty, should at least have {} line(s).".format(
+                min_line_count
+            )
             return [RuleViolation(self.id, message, line_nr=1)]
 
 
@@ -48,14 +55,16 @@ class BodyMaxLineCount(CommitRule):
         line_count = len(commit.message.body)
         max_line_count = self.options["max-line-count"].value
         if line_count > max_line_count:
-            message = "Commit message body contains too many lines ({0} > {1})".format(line_count, max_line_count)
+            message = "Commit message body contains too many lines ({0} > {1})".format(
+                line_count, max_line_count
+            )
             return [RuleViolation(self.id, message, line_nr=1)]
 
 
 class SignedOffBy(CommitRule):
     """
-    This rule will enforce that each commit contains a "Signed-off-by" line. We keep things simple here and just check
-    whether the commit body contains a line that starts with "Signed-off-by".
+    This rule will enforce that each commit contains a "Signed-off-by" line. We keep things simple
+    here and just check whether the commit body contains a line that starts with "Signed-off-by".
     """
 
     # A rule MUST have a human friendly name
@@ -69,11 +78,19 @@ class SignedOffBy(CommitRule):
         flags |= re.IGNORECASE
         for line in commit.message.body:
             if line.lower().startswith("signed-off-by"):
-                if not re.search(r"(^)Signed-off-by: ([-'\w.]+) ([-'\w.]+) (.*)", line, flags=flags):
-                    return [RuleViolation(self.id, "Signed-off-by: must have a full name", line_nr=1)]
+                if not re.search(
+                    r"(^)Signed-off-by: ([-'\w.]+) ([-'\w.]+) (.*)", line, flags=flags
+                ):
+                    return [
+                        RuleViolation(self.id, "Signed-off-by: must have a full name", line_nr=1)
+                    ]
                 else:
                     return
-        return [RuleViolation(self.id, "Commit message does not contain a 'Signed-off-by:' line", line_nr=1)]
+        return [
+            RuleViolation(
+                self.id, "Commit message does not contain a 'Signed-off-by:' line", line_nr=1
+            )
+        ]
 
 
 class TitleMaxLengthRevert(LineRule):
@@ -86,7 +103,9 @@ class TitleMaxLengthRevert(LineRule):
     def validate(self, line, _commit):
         max_length = self.options["line-length"].value
         if len(line) > max_length and not line.startswith("Revert"):
-            return [RuleViolation(self.id, self.violation_message.format(len(line), max_length), line)]
+            return [
+                RuleViolation(self.id, self.violation_message.format(len(line), max_length), line)
+            ]
 
 
 class TitleStartsWithSubsystem(LineRule):
@@ -112,7 +131,9 @@ class MaxLineLengthExceptions(LineRule):
 
     def validate(self, line, _commit):
         max_length = self.options["line-length"].value
-        urls = re.findall(r"https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|%[0-9a-fA-F][0-9a-fA-F])+", line)
+        urls = re.findall(
+            r"https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|%[0-9a-fA-F][0-9a-fA-F])+", line
+        )
         if line.lower().startswith("signed-off-by") or line.lower().startswith("co-authored-by"):
             return
 
@@ -120,7 +141,9 @@ class MaxLineLengthExceptions(LineRule):
             return
 
         if len(line) > max_length:
-            return [RuleViolation(self.id, self.violation_message.format(len(line), max_length), line)]
+            return [
+                RuleViolation(self.id, self.violation_message.format(len(line), max_length), line)
+            ]
 
 
 class BodyContainsBlockedTags(LineRule):
