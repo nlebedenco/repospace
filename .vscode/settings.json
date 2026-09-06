@@ -120,6 +120,7 @@
   // tools but not the engine's file watcher or search/quick-open indexer.
   "files.watcherExclude": {
     "**/.build*": true,
+    "**/.git*": true,
     "**/.lock*": true,
     "**/.venv": true,
     "**/node_modules": true,
@@ -148,6 +149,7 @@
   "python.useEnvironmentsExtension": true,
   "search.exclude": {
     "**/.build*": true,
+    "**/.git": true,
     "**/.lock*": true,
     "**/.venv": true,
     "**/node_modules": true,
