@@ -7,6 +7,7 @@
 # The tag must equal "v" + repospace.__version__ (src/repospace/__init__.py); the build job fails
 # otherwise.
 name: Release
+run-name: Release ${{ github.ref_name }}
 
 on:
   push:
