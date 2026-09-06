@@ -148,43 +148,63 @@ def _local_path(topdir: Optional[str]) -> Optional[str]:
 # non-greedy match would edit options the reader attributes to another section, writing values no
 # read can find.
 _HEADER_RE = re.compile(r"\[(.+)\]")
+# The first non-blank character of a line; its offset is the indentation configparser compares.
+_NONSPACE_RE = re.compile(r"\S")
 
 
-def _option_key(line: str) -> Optional[str]:
-    """Return the lowercased key if *line* starts an option, else None."""
-    if line[:1] in (" ", "\t") or not line.strip():
-        return None
-    stripped = line.strip()
-    if stripped[0] in "#;[":
-        return None
-    for index, char in enumerate(line):
-        if char in "=:":
-            return line[:index].strip().lower()
-    # allow_no_value: a key may appear without a delimiter.
-    return stripped.lower()
+def _scan(lines) -> list:
+    """Classify every line the way configparser's reader does.
+
+    Returns one (kind, name) pair per line: ("header", section), ("option", key), ("continuation",
+    None), ("comment", None) or ("blank", None), with section and key lowercased. The reader's rule
+    is reproduced rather than approximated: an indented line continues an option only while one is
+    in progress and the line is indented deeper than the option's own line. Directly after a section
+    header no option is in progress, so an indented "key = value" or "[...]" there starts an option
+    or a section; comments and blank lines leave the state alone. An editor taking every indented
+    line for a continuation would overlook such lines and write a second copy of an option (which
+    the strict reader then rejects, breaking every later invocation) or into the wrong section.
+    """
+    kinds = []
+    indent_level = 0
+    in_option = False
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            kinds.append(("blank", None))
+            continue
+        if stripped[0] in "#;":
+            kinds.append(("comment", None))
+            continue
+        indent = _NONSPACE_RE.search(line).start()
+        if in_option and indent > indent_level:
+            kinds.append(("continuation", None))
+            continue
+        indent_level = indent
+        match = _HEADER_RE.match(stripped)
+        if match:
+            kinds.append(("header", match.group(1).lower()))
+            in_option = False
+        else:
+            # The key is everything before the first delimiter; allow_no_value lets it stand alone.
+            kinds.append(("option", re.split("[=:]", stripped, maxsplit=1)[0].strip().lower()))
+            in_option = True
+    return kinds
 
 
-def _value_end(lines, start: int) -> int:
-    """Index one past the value block of the option starting at *start*.
+def _value_end(kinds, start: int) -> int:
+    """Index one past the value block of the option at *start*.
 
-    Continuation lines are indented; a blank line belongs to the value only when further indented
-    content follows (configparser's empty_lines_in_values default). Leaving such lines behind would
-    attach them to whatever replaces the option.
+    The block runs to the option's last continuation line, taking in the blank and comment lines
+    among them (the reader keeps the blanks in the value, empty_lines_in_values). Blank and comment
+    lines after the last continuation line belong to no value and stay where they are.
     """
     end = start + 1
-    while end < len(lines):
-        line = lines[end]
-        if line[:1] in (" ", "\t") and line.strip():
-            end += 1
-            continue
-        if not line.strip():
-            look = end + 1
-            while look < len(lines) and not lines[look].strip():
-                look += 1
-            if look < len(lines) and lines[look][:1] in (" ", "\t") and lines[look].strip():
-                end = look + 1
-                continue
-        break
+    for index in range(start + 1, len(kinds)):
+        kind = kinds[index][0]
+        if kind == "continuation":
+            end = index + 1
+        elif kind not in ("blank", "comment"):
+            break
     return end
 
 
@@ -206,18 +226,9 @@ def _edited(text: str, section: str, key: str, value: Optional[str]) -> str:
         # back.
         lines.pop()
 
-    def matching_spans():
+    def matching_spans(kinds):
         """(header index, end index) of sections named *section*."""
-        headers = []
-        for index, line in enumerate(lines):
-            if line[:1] in (" ", "\t"):
-                # An indented "[...]" line is a value continuation.
-                continue
-            stripped = line.strip()
-            if stripped.startswith("["):
-                match = _HEADER_RE.match(stripped)
-                if match:
-                    headers.append((index, match.group(1).lower()))
+        headers = [(index, name) for index, (kind, name) in enumerate(kinds) if kind == "header"]
         spans = []
         for pos, (index, name) in enumerate(headers):
             if name == section:
@@ -225,21 +236,22 @@ def _edited(text: str, section: str, key: str, value: Optional[str]) -> str:
                 spans.append((index, stop))
         return spans
 
+    def indent_of(index):
+        return lines[index][: _NONSPACE_RE.search(lines[index]).start()]
+
     def joined():
         return "\n".join(lines) + "\n" if lines else ""
 
-    spans = matching_spans()
+    kinds = _scan(lines)
+    spans = matching_spans(kinds)
     # The option's occurrences, as (start, end) line ranges. Sections differing only in case merge
     # on read with the later definition winning, so the same key may occur more than once.
-    found = []
-    for start, stop in spans:
-        index = start + 1
-        while index < stop:
-            if _option_key(lines[index]) == key:
-                found.append((index, min(_value_end(lines, index), stop)))
-                index = found[-1][1]
-            else:
-                index += 1
+    found = [
+        (index, _value_end(kinds, index))
+        for start, stop in spans
+        for index in range(start + 1, stop)
+        if kinds[index] == ("option", key)
+    ]
 
     if value is None:
         # Delete every occurrence: removing only the last would resurrect an earlier, shadowed one.
@@ -247,31 +259,42 @@ def _edited(text: str, section: str, key: str, value: Optional[str]) -> str:
             del lines[start:end]
         # Drop matching sections whose bodies are now all blank; a body that still holds comments
         # keeps its header, so the comments keep their context.
-        for start, stop in reversed(matching_spans()):
+        for start, stop in reversed(matching_spans(_scan(lines))):
             if all(not lines[i].strip() for i in range(start + 1, stop)):
                 del lines[start:stop]
         return joined()
 
-    # Same formatting as ConfigParser.write(), so the value reads back identically.
-    new = f"{key} = {value}".replace("\n", "\n\t").split("\n")
     if found:
-        # Replace the last occurrence: on read, later definitions win.
+        # Replace the last occurrence: on read, later definitions win. The line keeps its own
+        # indentation, which is what the reader classifies the lines after it against: a deeper
+        # indented option that follows would otherwise turn into a continuation of this one.
         start, end = found[-1]
-        lines[start:end] = new
+        indent = indent_of(start)
     elif spans:
         # Append inside the section, after its last non-blank line, so a blank separator before the
-        # next section stays where it is.
+        # next section stays where it is. Indented like the section's last option, or like the next
+        # section's header if that is deeper — the header must not continue the new option.
         start, stop = spans[-1]
-        insert = start + 1
+        end = start + 1
+        indent = ""
         for index in range(start + 1, stop):
             if lines[index].strip():
-                insert = index + 1
-        lines[insert:insert] = new
+                end = index + 1
+            if kinds[index][0] == "option":
+                indent = indent_of(index)
+        if stop < len(lines) and len(indent_of(stop)) > len(indent):
+            indent = indent_of(stop)
+        start = end
     else:
         if lines and lines[-1].strip():
             lines.append("")
         lines.append(f"[{section}]")
-        lines.extend(new)
+        start = end = len(lines)
+        indent = ""
+    # Same formatting as ConfigParser.write(), so the value reads back identically; continuation
+    # lines are indented one step past the option line.
+    new = f"{key} = {value}".split("\n")
+    lines[start:end] = [indent + new[0]] + [indent + "\t" + line for line in new[1:]]
     return joined()
 
 
@@ -449,14 +472,13 @@ class Configuration:
                 "local configuration file location unknown; run inside a "
                 "repospace or set REPOSPACE_CONFIG_LOCAL"
             )
-        parser = self._parsers[configfile]
-        try:
-            if not parser.has_section(section):
-                parser.add_section(section)
-            parser.set(section, key, value)
-        except ValueError as err:
-            raise MalformedConfig(f'cannot set "{option}": {err}')
+        # The file first, then the in-memory view: after a failed write, get() must keep answering
+        # what the file says rather than what this call meant to store.
         self._edit_file(configfile, section, key, value)
+        parser = self._parsers[configfile]
+        if not parser.has_section(section):
+            parser.add_section(section)
+        parser.set(section, key, value)
 
     def delete(self, option: str, configfile: Optional[ConfigFile] = None) -> None:
         """Delete *option*.
@@ -480,10 +502,11 @@ class Configuration:
             parser = self._parsers[level]
             if not parser.has_option(section, key):
                 continue
+            # The file first, as in set().
+            self._edit_file(level, section, key, None)
             parser.remove_option(section, key)
             if not parser.options(section):
                 parser.remove_section(section)
-            self._edit_file(level, section, key, None)
             deleted = True
             if not delete_all:
                 return

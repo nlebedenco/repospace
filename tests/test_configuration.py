@@ -548,3 +548,97 @@ def test_non_utf8_file_raises_malformed_config(repospace):
     with pytest.raises(MalformedConfig) as excinfo:
         Configuration(topdir=str(repospace))
     assert "not valid UTF-8" in str(excinfo.value)
+
+
+def test_set_replaces_an_indented_option(repospace):
+    # Directly after a section header nothing is in progress for an indented line to continue, so
+    # configparser reads "    up = update" as an option. The editor must find that line too, or it
+    # appends a second, unindented copy that the strict reader rejects on every later invocation.
+    path = repospace / ".repospace" / "config"
+    write_ini(path, "[alias]\n    up = update\n    st = status\n")
+    config = Configuration(topdir=str(repospace))
+    assert config.get("alias.up") == "update"
+    config.set("alias.up", "update -v")
+    assert path.read_text() == "[alias]\n    up = update -v\n    st = status\n"
+    fresh = Configuration(topdir=str(repospace))
+    assert fresh.get("alias.up") == "update -v"
+    assert fresh.get("alias.st") == "status"
+
+
+def test_delete_removes_an_indented_option(repospace):
+    path = repospace / ".repospace" / "config"
+    write_ini(path, "[alias]\n    up = update\n    st = status\n")
+    config = Configuration(topdir=str(repospace))
+    config.delete("alias.up")
+    assert path.read_text() == "[alias]\n    st = status\n"
+    fresh = Configuration(topdir=str(repospace))
+    assert fresh.get("alias.up") is None
+    assert fresh.get("alias.st") == "status"
+
+
+def test_set_appends_with_the_indentation_of_the_section(repospace):
+    path = repospace / ".repospace" / "config"
+    write_ini(path, "[alias]\n    up = update\n\n[color]\nui = auto\n")
+    config = Configuration(topdir=str(repospace))
+    config.set("alias.st", "status")
+    assert path.read_text() == "[alias]\n    up = update\n    st = status\n\n[color]\nui = auto\n"
+    fresh = Configuration(topdir=str(repospace))
+    assert fresh.get("alias.st") == "status"
+    assert fresh.get("color.ui") == "auto"
+
+
+def test_set_agrees_with_the_reader_on_indented_section_headers(repospace):
+    # To configparser an indented "[...]" line is a section header directly after another header,
+    # and a continuation of the value after an option. The editor must tell the two apart, or a
+    # write addressed to one section lands in another.
+    path = repospace / ".repospace" / "config"
+    write_ini(path, "[s1]\n  [s2]\nk = 1\n[s3]\na = 1\n  [s4]\n")
+    config = Configuration(topdir=str(repospace))
+    assert config.get("s1.k") is None
+    assert config.get("s2.k") == "1"
+    assert config.get("s3.a") == "1\n[s4]"
+    config.set("s1.k", "9")
+    config.set("s3.a", "flat")
+    assert path.read_text() == "[s1]\n  k = 9\n  [s2]\nk = 1\n[s3]\na = flat\n"
+    fresh = Configuration(topdir=str(repospace))
+    assert fresh.get("s1.k") == "9"
+    assert fresh.get("s2.k") == "1"
+    assert fresh.get("s3.a") == "flat"
+
+
+def test_edits_leave_an_indented_comment_after_the_option_alone(repospace):
+    # A comment is a comment to configparser however it is indented, so it is no part of the value
+    # block and must survive the option being replaced or deleted.
+    path = repospace / ".repospace" / "config"
+    write_ini(path, "[s]\nk = 1\n  # keep me\nj = 2\n")
+    config = Configuration(topdir=str(repospace))
+    assert config.get("s.k") == "1"
+    config.set("s.k", "5")
+    assert path.read_text() == "[s]\nk = 5\n  # keep me\nj = 2\n"
+    config.delete("s.k")
+    assert path.read_text() == "[s]\n  # keep me\nj = 2\n"
+    fresh = Configuration(topdir=str(repospace))
+    assert fresh.get("s.k") is None
+    assert fresh.get("s.j") == "2"
+
+
+def test_failed_write_leaves_the_instance_unchanged(repospace, monkeypatch):
+    # The in-memory view follows the file: a caller that survives the error must not keep reading a
+    # value the file never received.
+    path = repospace / ".repospace" / "config"
+    write_ini(path, "[a]\nb = 1\n")
+    config = Configuration(topdir=str(repospace))
+
+    def boom(*args, **kwargs):
+        raise OSError("boom")
+
+    monkeypatch.setattr(configuration, "_replace_file", boom)
+    with pytest.raises(MalformedConfig):
+        config.set("a.b", "2")
+    assert config.get("a.b") == "1"
+    with pytest.raises(MalformedConfig):
+        config.set("c.d", "3")
+    assert config.get("c.d") is None
+    with pytest.raises(MalformedConfig):
+        config.delete("a.b")
+    assert config.get("a.b") == "1"
