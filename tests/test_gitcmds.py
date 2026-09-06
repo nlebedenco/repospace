@@ -461,7 +461,9 @@ def test_compare_ref_named_head(updated, run_repospace):
     # A tag named HEAD makes "rev-parse --abbrev-ref HEAD" succeed with empty output; the member is
     # detached and up to date, so there is nothing to report and --exit-code must stay happy.
     libb = updated.ws / "libb"
-    subprocess.run(["git", "-C", str(libb), "tag", "HEAD"], check=True)
+    # "git tag HEAD" is refused by newer git; update-ref still creates the ref, as git's own
+    # test suite does.
+    subprocess.run(["git", "-C", str(libb), "update-ref", "refs/tags/HEAD", "HEAD"], check=True)
     out, _ = run(run_repospace, updated, "compare", "--exit-code")
     assert out == ""
 

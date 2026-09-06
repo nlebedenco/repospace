@@ -1073,7 +1073,9 @@ def test_update_with_ref_named_head(repospace, run_repospace):
     # detached, so there is no branch left behind and no switch-back hint to give.
     update(run_repospace, repospace)
     libb = repospace.ws / "libb"
-    subprocess.run(["git", "-C", str(libb), "tag", "HEAD"], check=True)
+    # "git tag HEAD" is refused by newer git; update-ref still creates the ref, as git's own
+    # test suite does.
+    subprocess.run(["git", "-C", str(libb), "update-ref", "refs/tags/HEAD", "HEAD"], check=True)
     out, err = update(run_repospace, repospace, "libb")
     assert "left branch" not in out
     assert "checkout" not in out
