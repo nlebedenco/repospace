@@ -100,7 +100,7 @@ Each entry accepts:
 | `repo-path`          | string           | `name`              | Suffix appended to the remote's `url-base`                                                                           |
 | `url`                | string           | derived             | Complete fetch URL (mutually exclusive with `remote`/`repo-path`)                                                    |
 | `revision`           | string           | `defaults.revision` | Branch, tag, or commit SHA (refname-safe: no leading `-`/`+`, no `~^:?*[\`, whitespace, `..`, `@{`)                  |
-| `path`               | string           | `name`              | Checkout path relative to the repospace top (POSIX separators; must stay inside the repospace; no `.git` components) |
+| `path`               | string           | `name`              | Checkout path relative to the accumulated import `path-prefix`, or to the repospace top when there is none           |
 | `submodules`         | bool or list     | `false`             | `true` = update all recursively; or a list of `{path, name}`                                                         |
 | `clone-depth`        | positive int     | none                | Passed to `git fetch --depth`                                                                                        |
 | `extension-commands` | string or list   | none                | Extension command specification file(s), relative to the member root                                                 |
@@ -110,13 +110,15 @@ Each entry accepts:
 | `upstream`           | mapping          | none                | The repository this member's origin forks, and the refs `repospace mirror` keeps equal to it (see below)             |
 | `userdata`           | any              | none                | Ignored by repospace                                                                                                 |
 
-Member paths are confined to the repospace: absolute paths, drive letters, `..`
-escapes, `.git` path components (in any case — member content must never act as
-a git directory), and placement inside `.repospace/` are rejected lexically. A
-path is normalized before it is used, so `libs/x/../y` *is* `libs/y` — that is
-the placement, and the form re-emitted by `manifest --resolve`; a path that
-normalizes to the repospace top itself (or, in an imported manifest, to its
-`path-prefix` directory) is rejected.
+Member paths use forward slashes and are confined to the repospace: backslashes,
+absolute paths, drive letters, `..` escapes, `.git` path components (in any case
+— member content must never act as a git directory), and placement inside
+`.repospace/` are rejected lexically. A path is normalized before it is used, so
+`libs/x/../y` *is* `libs/y` — that is the placement, and the form re-emitted by
+`manifest --resolve`; a path that normalizes to the repospace top itself (or, in
+an imported manifest, to its `path-prefix` directory) is rejected. Confinement
+is to the repospace top, not to the `path-prefix`: under a prefix of `external`,
+`path: ../tools/foo` places the member at `tools/foo`.
 
 Member checkouts live in real directories inside the repospace: no existing
 component of a member path below the repospace top may be a symbolic link — the
