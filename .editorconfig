@@ -16,6 +16,8 @@ indent_size = 4
 # Git commit messages
 [COMMIT_EDITMSG]
 max_line_length = 75
+indent_style = space
+indent_size = 4
 
 # Git modules manifest
 [.gitmodules]
@@ -26,18 +28,30 @@ indent_size = 4
 [LICENSE]
 max_line_length = 80
 
+# CMake
+[{CMakeLists.txt,*.cmake}]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
 # JSON
 [*.json]
+indent_style = space
 indent_size = 2
 
 # Markdown
 [*.md]
+indent_style = space
+indent_size = 2
 max_line_length = 80
 
 # Windows Command Script
 [*.{bat,bat.in,cmd,cmd.in,ps1}]
+indent_style = space
+indent_size = 4
 end_of_line = crlf
 
 # YAML
 [{*.apinotes,*.yaml,*.yml}]
+indent_style = space
 indent_size = 2
