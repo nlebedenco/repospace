@@ -11,6 +11,7 @@ from repospace.app.common import MemberCommand
 from repospace.app.generate import MEMBERS_JSON
 from repospace.commands import HelpFormatter, RepospaceCommand
 from repospace.manifest import (
+    MANIFEST_MEMBER_NAME,
     QUAL_MANIFEST_REV,
     ImportFlag,
     MalformedManifest,
@@ -19,17 +20,17 @@ from repospace.manifest import (
     manifest_file,
 )
 
-_DEFAULT_FORMAT = "{name:12} {path:28} {revision:40} {url}"
+_DEFAULT_KEYS = ("name", "path", "revision", "url")
 
 _LIST_DESCRIPTION = f"""\
 Print information about members, one per line, using FORMAT.
 
-FORMAT is a Python format string; the default is
-"{_DEFAULT_FORMAT}".
+FORMAT is a Python format string. Without it, the keys {", ".join(_DEFAULT_KEYS)} are printed as
+columns, each padded to the widest value it holds.
 Available keys: name, description, url, path, abspath, posixpath, revision, sha, cloned, active,
 clone_depth, groups, declared_by, stale.
 
-The "stale" key (also appended to default-format output) flags members whose on-disk state may not
+The "stale" key (also appended to default output) flags members whose on-disk state may not
 match the manifest: not-cloned, diverged (HEAD moved off repospace-rev), update-needed (declared
 tag/commit no longer matches repospace-rev), and revision/url/path-changed or added (manifest edited
 since the last update, detected via the .repospace/members.json snapshot).
@@ -141,31 +142,53 @@ class List(MemberCommand):
             self.parser.error("-i cannot be combined with an explicit member list")
         manifest = self.manifest
         snapshot = self._load_snapshot()
-        fmt = args.fmt or _DEFAULT_FORMAT
-        default_fmt = args.fmt is None
 
-        members = self.selected_members(args, include_manifest=True, only_active=False)
-        for member in members:
-            active = isinstance(member, ManifestMember) or manifest.is_active(member)
-            if not args.members:
-                if args.inactive:
-                    if active:
-                        continue
-                elif not (args.all or active):
-                    continue
-            try:
-                line = fmt.format_map(_LazyFormatMap(self, member, snapshot))
-            except KeyError as err:
-                self.die(f"unknown format key {err}")
-            except (ValueError, IndexError) as err:
-                self.die(f"malformed format string: {err}")
-            if default_fmt:
-                reasons = self.stale_reasons(member, snapshot)
-                if reasons:
-                    line += f' (stale: {",".join(reasons)})'
-            print(line)
+        members = [
+            member
+            for member in self.selected_members(args, include_manifest=True, only_active=False)
+            if self._is_listed(member, args, manifest)
+        ]
+        if args.fmt:
+            for member in members:
+                try:
+                    print(args.fmt.format_map(_LazyFormatMap(self, member, snapshot)))
+                except KeyError as err:
+                    self.die(f"unknown format key {err}")
+                except (ValueError, IndexError) as err:
+                    self.die(f"malformed format string: {err}")
+        else:
+            self._print_columns(members, snapshot)
 
         self._warn_snapshot_issues(manifest, snapshot)
+
+    def _is_listed(self, member, args, manifest):
+        if args.members:
+            return True
+        active = isinstance(member, ManifestMember) or manifest.is_active(member)
+        if args.inactive:
+            return not active
+        return args.all or active
+
+    def _print_columns(self, members, snapshot):
+        # Widths come from the values actually listed: fixed ones shift every following column right
+        # as soon as a single name or path overflows them. Only the padded columns are collected up
+        # front, and reading them costs nothing; the stale suffix lands on the last column, which
+        # has no width, so it is computed while printing rather than holding the first line back
+        # behind every member's git calls.
+        rows = []
+        for member in members:
+            values = _LazyFormatMap(self, member, snapshot)
+            rows.append([values[key] for key in _DEFAULT_KEYS])
+        if not rows:
+            return
+        # The last column is left unpadded, so it has no width.
+        widths = [max(len(row[i]) for row in rows) for i in range(len(_DEFAULT_KEYS) - 1)]
+        for member, row in zip(members, rows):
+            reasons = self.stale_reasons(member, snapshot)
+            if reasons:
+                row[-1] += f' (stale: {",".join(reasons)})'
+            cells = [cell.ljust(width) for cell, width in zip(row, widths)]
+            print(" ".join(cells + row[len(widths) :]))
 
     # -- staleness ---------------------------------------------------------
 
@@ -187,7 +210,7 @@ class List(MemberCommand):
             return
         live = {m.name for m in manifest.members}
         for name in snapshot:
-            if name != "manifest" and name not in live:
+            if name != MANIFEST_MEMBER_NAME and name not in live:
                 self.wrn(
                     f'member "{name}" from the last update is no longer '
                     "in the manifest (its directory, if any, was not "

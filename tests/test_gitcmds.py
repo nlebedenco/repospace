@@ -40,6 +40,22 @@ def test_list_default(updated, run_repospace):
     assert "stale" not in out
 
 
+def test_list_default_columns_align(updated, run_repospace):
+    # A name wider than the column must push the whole row, not just its own line, to the right.
+    updated.rewrite_app_yaml(
+        extra_members=(
+            "    - name: a-member-with-a-very-long-name\n"
+            f"      url: {updated.url(updated.libc_src)}\n"
+        )
+    )
+    out, _ = run(run_repospace, updated, "list")
+    lines = out.splitlines()
+    assert any(line.startswith("a-member-with-a-very-long-name ") for line in lines)
+    # Only the first four fields are columns; a stale suffix follows the last one.
+    starts = {tuple(m.start() for m in re.finditer(r"\S+", line))[:4] for line in lines}
+    assert len(starts) == 1
+
+
 def test_list_custom_format(updated, run_repospace):
     out, _ = run(run_repospace, updated, "list", "-f", "{name}|{declared_by}|{cloned}")
     assert "libc|liba|cloned" in out.splitlines()
