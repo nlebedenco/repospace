@@ -6,12 +6,18 @@ import textwrap
 
 import pytest
 
+from repospace import __version__
 from repospace.manifest import (
+    MIRROR_ALL,
+    PRESERVE_NONE,
+    SCHEMA_VERSION,
     MalformedManifest,
     Manifest,
     ManifestMember,
     ManifestVersionError,
+    RefPatterns,
     Submodule,
+    Upstream,
     validate,
 )
 
@@ -219,8 +225,12 @@ def test_refname_safe_revisions_accepted(revision):
             '".git" component',
         ),
         ("- name: .git\n      url: u", '".git" component'),
-        ("- name: a\n      url: u\n      path:", '"path" is not a string'),
-        ("- name: a\n      url:", '"url" is not a string'),
+        # An explicit null is an editing artifact, not a type error: say what to do about it.
+        ("- name: a\n      url: u\n      path:", '"path" has no value; remove the key or set'),
+        ("- name: a\n      url:", '"url" has no value; remove the key or set'),
+        ("- name: a\n      url: u\n      remote:", '"remote" has no value'),
+        ("- name: a\n      url: u\n      description:", '"description" has no value'),
+        ("- name: a\n      url: 7", '"url" is not a string'),
         ("- name: ''\n      url: u", 'non-empty string "name"'),
         ("- name: a\n      url: ''", '"url" is empty'),
         ("- name: a\n      url: u\n      path: ''", '"path" is empty'),
@@ -273,6 +283,15 @@ _MEMBER_HEAD = "manifest:\n  members:\n    - name: a\n      url: u\n"
         ),
         (_MEMBER_HEAD + "      import:\n", '"import: false"'),
         (_MEMBER_HEAD + "      groups:\n", '"groups" has no value'),
+        (_MEMBER_HEAD + "      upstream:\n", '"upstream" has no value'),
+        (
+            _MEMBER_HEAD + "      upstream:\n        url: u2\n        mirror:\n",
+            '"mirror" has no value',
+        ),
+        (
+            _MEMBER_HEAD + "      upstream:\n        url: u2\n        mirror:\n          heads:\n",
+            '"heads" has no value',
+        ),
         (
             _MEMBER_HEAD + "      import:\n        name-allowlist:\n",
             '"name-allowlist" has no value',
@@ -479,14 +498,17 @@ def test_self_path_no_longer_accepted():
 @pytest.mark.parametrize(
     "text,exc",
     [
-        ("manifest:\n  version: '1.0'\n", None),
-        ("manifest:\n  version: 1.0\n", None),
-        ("manifest:\n  version: '1.0.0'\n", None),
-        ("manifest:\n  version: '1'\n", None),
-        ("manifest:\n  version: '2.0'\n", ManifestVersionError),
-        ("manifest:\n  version: '1.5'\n", ManifestVersionError),
-        ("manifest:\n  version: '1.0.1'\n", ManifestVersionError),
-        ("manifest:\n  version: '0.9'\n", MalformedManifest),
+        ("manifest:\n  version: '0.2'\n", None),
+        ("manifest:\n  version: 0.2\n", None),
+        # Newer than this repospace: the answer is "upgrade", not "invalid".
+        ("manifest:\n  version: '0.3'\n", ManifestVersionError),
+        ("manifest:\n  version: '1.0'\n", ManifestVersionError),
+        ("manifest:\n  version: '0.2.1'\n", ManifestVersionError),
+        # Not newer, but no such schema version was ever released. "0.2.0" compares equal to the
+        # supported version and is still rejected: one version, one way to write it.
+        ("manifest:\n  version: '0.2.0'\n", MalformedManifest),
+        ("manifest:\n  version: '0.1'\n", MalformedManifest),
+        ("manifest:\n  version: '0'\n", MalformedManifest),
         ("manifest:\n  version: 'banana'\n", MalformedManifest),
     ],
 )
@@ -507,6 +529,29 @@ def test_version_checked_before_structure():
               version: '2.0'
               shiny-new-section: {}
             """)
+
+
+def test_invalid_version_lists_the_valid_ones():
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data("manifest:\n  version: '0.1'\n")
+    assert f"must be one of: {SCHEMA_VERSION}" in str(excinfo.value)
+
+
+def test_unquoted_version_hints_at_quoting():
+    # YAML reads 0.10 as the number 0.1, a version of its own; the hint points at the cause.
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data("manifest:\n  version: 0.10\n")
+    assert '"0.1"' in str(excinfo.value)
+    assert "quote" in str(excinfo.value)
+
+
+def test_schema_version_tracks_package_version():
+    # The schema version is the major.minor of the release that last changed the manifest format:
+    # it may lag repospace's own version, but must never run ahead of it.
+    schema = tuple(int(part) for part in SCHEMA_VERSION.split("."))
+    package = tuple(int(part) for part in __version__.split(".")[:2])
+    assert len(schema) == 2
+    assert schema <= package
 
 
 def test_null_version_rejected():
@@ -691,7 +736,7 @@ def test_as_dict_resolved_output():
         """)
     data = manifest.as_dict()
     mdata = data["manifest"]
-    assert mdata["version"] == "1.0"
+    assert mdata["version"] == SCHEMA_VERSION
     assert mdata["group-filter"] == ["-opt"]
     a, b = mdata["members"]
     assert a == {
@@ -888,3 +933,246 @@ def test_non_utf8_manifest_raises_malformed(tmp_path):
     with pytest.raises(MalformedManifest) as excinfo:
         Manifest.from_topdir(str(tmp_path))
     assert "not valid UTF-8" in str(excinfo.value)
+
+
+# ---------------------------------------------------------------------------
+# upstream
+
+
+def _upstream_member(body):
+    return f"manifest:\n  members:\n    - name: a\n      url: u\n      upstream:\n{body}"
+
+
+def test_upstream_defaults_to_every_branch_and_tag():
+    manifest = load(_upstream_member("        url: up\n"))
+    upstream = manifest.members[1].upstream
+    assert upstream == Upstream("up")
+    # "**", not "*": a single star would leave a hierarchical name such as release/1.0 unselected.
+    assert upstream.mirror == MIRROR_ALL == RefPatterns(("**",), ("**",))
+    assert upstream.preserve == PRESERVE_NONE
+
+
+def test_upstream_absent_is_none():
+    assert load("manifest:\n  members:\n    - name: a\n      url: u\n").members[1].upstream is None
+
+
+def test_upstream_patterns_parsed():
+    manifest = load(
+        _upstream_member(
+            "        url: up\n"
+            "        mirror:\n"
+            "          heads: [main, 'release/*']\n"
+            "          tags: ['v[0-9]*']\n"
+            "        preserve:\n"
+            "          heads: ['forked/*']\n"
+        )
+    )
+    upstream = manifest.members[1].upstream
+    assert upstream.mirror == RefPatterns(("main", "release/*"), ("v[0-9]*",))
+    # A list left out keeps its default: preserving branches does not stop tags being mirrored.
+    assert upstream.preserve == RefPatterns(("forked/*",), ())
+
+
+@pytest.mark.parametrize(
+    "member,expected",
+    [
+        # An upstream URL is spelled exactly like a member's.
+        ("      upstream:\n        url: https://up.example.com/a\n", "https://up.example.com/a"),
+        ("      upstream:\n        remote: r\n", "https://example.com/a"),
+        (
+            "      upstream:\n        remote: r\n        repo-path: other\n",
+            "https://example.com/other",
+        ),
+        ("      upstream:\n        repo-path: other\n", "https://example.com/other"),
+    ],
+)
+def test_upstream_url_resolution(member, expected):
+    manifest = load(
+        "manifest:\n"
+        "  defaults:\n"
+        "    remote: r\n"
+        "  remotes:\n"
+        "    - name: r\n"
+        "      url-base: https://example.com/\n"
+        "  members:\n"
+        "    - name: a\n"
+        "      url: https://fork.example.com/a\n"
+        f"{member}"
+    )
+    assert manifest.members[1].upstream.url == expected
+
+
+def test_upstream_exclusion_patterns_parsed():
+    manifest = load(
+        _upstream_member(
+            "        url: up\n"
+            "        mirror:\n"
+            "          heads: ['**', '!wip/*', 'wip/keep']\n"
+            "        preserve:\n"
+            "          tags: ['forked/*', '!forked/tmp']\n"
+        )
+    )
+    upstream = manifest.members[1].upstream
+    # Order is kept: the last pattern matching a ref is the one that decides.
+    assert upstream.mirror.heads == ("**", "!wip/*", "wip/keep")
+    assert upstream.preserve.tags == ("forked/*", "!forked/tmp")
+
+
+def test_upstream_only_exclusions_in_a_tag_mirror_points_at_the_empty_list():
+    # "mirror: tags" is the one list that may select nothing on purpose, and [] is how to say so.
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data(
+            _upstream_member("        url: up\n        mirror:\n          tags: ['!v*']\n")
+        )
+    assert "write it as [] to select nothing" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    ["main", "release/*", "**", "v[0-9]*", "v[!0-9]*", "a?b", "refs/heads/main", "x@y", "a+b"],
+)
+def test_upstream_glob_patterns_accepted(pattern):
+    # Unlike a revision, a pattern may hold glob syntax: it is matched by repospace, never handed
+    # to git.
+    manifest = load(
+        _upstream_member(f"        url: up\n        mirror:\n          heads: ['{pattern}']\n")
+    )
+    assert manifest.members[1].upstream.mirror.heads == (pattern,)
+
+
+@pytest.mark.parametrize(
+    "body,fragment",
+    [
+        ("        url: u\n", "member's own url"),
+        # Same repository, different spelling: git treats a trailing "/" and the ".git" suffix as
+        # noise, and so must the guard -- a member mirroring itself force-overwrites its own refs.
+        ("        url: u.git\n", "member's own url"),
+        ("        url: u/\n", "member's own url"),
+        ("        url: u.git/\n", "member's own url"),
+        ("        url: up\n        remote: r\n", "both"),
+        ("        url: up\n        repo-path: p\n", "repo-path"),
+        ("        remote: nope\n", "not defined"),
+        ("        bogus: 1\n", "unknown key(s)"),
+        ("        url: ''\n", '"url" is empty'),
+        ("        url: 7\n", '"url" is not a string'),
+        # As on the member itself, an explicit null says what to do about it.
+        ("        url:\n", '"url" has no value; remove the key or set'),
+        ("        remote:\n", '"remote" has no value'),
+        ("        url: up\n        repo-path:\n", '"repo-path" has no value'),
+        ("        url: up\n        mirror: yes\n", "mirror is not a mapping"),
+        ("        url: up\n        mirror:\n          bogus: [x]\n", "unknown key(s)"),
+        ("        url: up\n        mirror:\n          heads: []\n", "non-empty list"),
+        ("        url: up\n        mirror:\n          heads: main\n", "non-empty list"),
+        ("        url: up\n        mirror:\n          heads: [7]\n", "non-empty list"),
+        ("        url: up\n        mirror:\n          heads: ['']\n", "empty pattern"),
+        ("        url: up\n        mirror:\n          heads: ['a b']\n", "contains ' '"),
+        ("        url: up\n        mirror:\n          heads: ['a~b']\n", "contains '~'"),
+        ("        url: up\n        mirror:\n          heads: ['a^b']\n", "contains '^'"),
+        ("        url: up\n        mirror:\n          heads: ['a:b']\n", "contains ':'"),
+        ("        url: up\n        mirror:\n          heads: ['a\\b']\n", "contains '\\\\'"),
+        ("        url: up\n        mirror:\n          heads: ['a..b']\n", 'contains ".."'),
+        ("        url: up\n        mirror:\n          heads: ['a@{1}']\n", 'contains "@{"'),
+        ("        url: up\n        mirror:\n          heads: ['@']\n", 'is "@"'),
+        # An exclusion is held to the same rules as any other pattern, below its "!".
+        ("        url: up\n        mirror:\n          heads: ['!a b']\n", "contains ' '"),
+        ("        url: up\n        mirror:\n          heads: ['!@']\n", 'is "@"'),
+        ("        url: up\n        mirror:\n          heads: ['!']\n", 'only "!"'),
+        # A list of nothing but exclusions selects nothing, whichever list it is.
+        ("        url: up\n        mirror:\n          heads: ['!wip/*']\n", "only exclusions"),
+        ("        url: up\n        mirror:\n          tags: ['!v*']\n", "only exclusions"),
+        ("        url: up\n        preserve:\n          heads: ['!wip/*']\n", "only exclusions"),
+        ("        url: up\n        preserve:\n          tags: []\n", "non-empty list"),
+    ],
+)
+def test_upstream_errors(body, fragment):
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data(_upstream_member(body))
+    assert fragment in str(excinfo.value)
+
+
+def test_upstream_without_url_or_default_remote_rejected():
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data(_upstream_member("        mirror:\n          heads: [main]\n"))
+    assert "no remote or url" in str(excinfo.value)
+
+
+def test_upstream_not_a_mapping_rejected():
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data(
+            "manifest:\n  members:\n    - name: a\n      url: u\n      upstream: up\n"
+        )
+    assert '"upstream" is not a mapping' in str(excinfo.value)
+
+
+def test_upstream_rejected_under_self():
+    # "self" describes the manifest repository, which no command mirrors.
+    with pytest.raises(MalformedManifest) as excinfo:
+        Manifest.from_data("manifest:\n  self:\n    upstream:\n      url: up\n")
+    assert "unknown key(s)" in str(excinfo.value)
+    assert "upstream" in str(excinfo.value)
+
+
+def test_upstream_round_trips_through_as_dict():
+    manifest = load(
+        _upstream_member(
+            "        url: up\n"
+            "        mirror:\n"
+            "          heads: [main]\n"
+            "        preserve:\n"
+            "          tags: ['forked/*']\n"
+        )
+    )
+    data = manifest.as_dict()
+    (member,) = data["manifest"]["members"]
+    # Only what differs from the defaults is emitted.
+    assert member["upstream"] == {
+        "url": "up",
+        "mirror": {"heads": ["main"]},
+        "preserve": {"tags": ["forked/*"]},
+    }
+    validate(data)
+    assert Manifest.from_data(data).members[1].upstream == manifest.members[1].upstream
+
+
+def test_default_upstream_round_trips_as_url_only():
+    manifest = load(_upstream_member("        url: up\n"))
+    (member,) = manifest.as_dict()["manifest"]["members"]
+    assert member["upstream"] == {"url": "up"}
+
+
+def test_upstream_refuses_an_empty_branch_mirror_at_construction():
+    # Upstream always has a default branch, so a mirror is always for at least one: an empty
+    # "mirror: heads" selects nothing at all, and with --prune it means "delete every branch origin
+    # has". No manifest can spell it either, so it must not be constructible at all -- catching it
+    # only in as_dict would let it reach compute_plan and be caught by nothing.
+    with pytest.raises(MalformedManifest) as excinfo:
+        Upstream("up", mirror=RefPatterns((), ("**",)))
+    assert '"mirror: heads" is empty' in str(excinfo.value)
+    # An empty "mirror: tags" is a fork that wants none of upstream's tags, which each list
+    # defaulting to "**" on its own leaves no other way to say.
+    assert Upstream("up", mirror=RefPatterns(("**",), ())).as_dict() == {
+        "url": "up",
+        "mirror": {"tags": []},
+    }
+    # An empty "preserve" list is the default, and it means what it says: preserve nothing.
+    assert Upstream("up", preserve=RefPatterns((), ())).as_dict() == {"url": "up"}
+
+
+def test_upstream_refuses_a_branch_mirror_of_only_exclusions_at_construction():
+    # An exclusion only narrows what another pattern selected, so a list of nothing else selects
+    # no branch either -- the same refusal as an empty list, for the same reason.
+    with pytest.raises(MalformedManifest) as excinfo:
+        Upstream("up", mirror=RefPatterns(("!wip/*",), ("**",)))
+    assert '"mirror: heads" holds only exclusions' in str(excinfo.value)
+    # A list holding one is fine: what it excludes is taken from what the others selected.
+    assert Upstream("up", mirror=RefPatterns(("**", "!wip/*"), ("**",))).mirror.heads == (
+        "**",
+        "!wip/*",
+    )
+
+
+def test_upstream_accepts_an_empty_tag_mirror():
+    manifest = load(_upstream_member("        url: up\n        mirror:\n          tags: []\n"))
+    upstream = manifest.members[1].upstream
+    assert upstream.mirror == RefPatterns(("**",), ())
+    assert upstream.as_dict()["mirror"] == {"tags": []}

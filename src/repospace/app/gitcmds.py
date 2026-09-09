@@ -406,9 +406,7 @@ class Grep(MemberCommand):
                         self.die(message)
                     self.wrn(message)
                     continue
-            elif not member.is_cloned():
-                if explicit:
-                    self.die(f"member {member.name_and_path} is not cloned")
+            elif not self.require_cloned(member, explicit):
                 continue
             if tool == "git-grep":
                 command = [tool_path or "git", "grep"]

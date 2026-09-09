@@ -7,7 +7,7 @@ import posixpath
 import subprocess
 import time
 
-from repospace.app.common import MemberCommand
+from repospace.app.common import MemberCommand, clean_scratch_refs, decode_ref, printable
 from repospace.commands import CommandError, HelpFormatter, Verbosity
 from repospace.git import git_version
 from repospace.manifest import (
@@ -44,6 +44,13 @@ resolution, so resolution always sees fresh data.
 #: keeps HEAD off names that matter.
 _INIT_PLACEHOLDER_BRANCH = "repospace-init-placeholder"
 
+#: Scratch namespace origin's branch tips are fetched into; cleaned after every member. Named by
+#: the namespace they come from, one level below QUAL_REFS, so that a branch name can never collide
+#: with a scratch namespace of another command: a ref and a directory of the same name cannot both
+#: exist, and a leftover ref would block that command for good (mirror keeps its own refs below
+#: refs/repospace/upstream/, which a branch named "upstream" would otherwise stand in the way of).
+SCRATCH = f"{QUAL_REFS}heads/"
+
 
 def _symlink_below_topdir(topdir: str, path: str):
     """Return the first symlinked component of <topdir>/<path>, or None.
@@ -60,26 +67,6 @@ def _symlink_below_topdir(topdir: str, path: str):
         if os.path.islink(prefix):
             return prefix
     return None
-
-
-def _decode_ref(data: bytes) -> str:
-    """Decode a git ref name so the exact bytes reach git again.
-
-    Ref names are byte strings; git accepts (and can be made to create) names that are not valid
-    UTF-8. Undecodable bytes are kept as surrogates, which subprocess re-encodes unchanged when the
-    name is passed back on a command line.
-    """
-    return os.fsdecode(data).strip()
-
-
-def _printable(text: str) -> str:
-    """Return *text* with undecodable bytes shown as escapes.
-
-    A name from _decode_ref may carry surrogates, which a strict UTF-8 stdout refuses to encode;
-    messages must survive printing it.
-    """
-    raw = text.encode("utf-8", "surrogateescape")
-    return raw.decode("utf-8", "backslashreplace")
 
 
 def _looks_like_sha(revision: str) -> bool:
@@ -373,6 +360,12 @@ class Update(MemberCommand):
         self._detach_from_manifest_rev(member)
 
         revision = member.revision
+        # Cleared before the fetch as well as after it. The "finally" below does not run when the
+        # process is killed mid-flight, and _fetch prefers a scratch ref over a same-named
+        # revision, so a leftover would both shadow the revision asked for and -- where the branch
+        # it came from has since become a directory upstream ("a" renamed to "a/b") -- make the
+        # fetch die on the leftover rather than on anything it did.
+        clean_scratch_refs(member)
         try:
             if self.fetch_strategy == "smart" and self._rev_type(member, revision) in (
                 "tag",
@@ -394,7 +387,7 @@ class Update(MemberCommand):
         finally:
             # Cleaned even when the fetch or update-ref fails: a stale scratch ref would shadow a
             # same-named revision in a later update (_fetch prefers the scratch ref).
-            self._clean_scratch_refs(member)
+            clean_scratch_refs(member)
         self._checkout(member, sha)
         if member.submodules:
             self._update_submodules(member)
@@ -463,7 +456,7 @@ class Update(MemberCommand):
             capture_stdout=True,
             capture_stderr=True,
         )
-        if result.returncode != 0 or _decode_ref(result.stdout) != QUAL_MANIFEST_REV:
+        if result.returncode != 0 or decode_ref(result.stdout) != QUAL_MANIFEST_REV:
             return
         if self._head_ok(member):
             member.git(["checkout", "-q", "--detach"])
@@ -516,7 +509,7 @@ class Update(MemberCommand):
         if sha_like:
             # Many servers refuse to serve a bare SHA; fetch all branch tips into a scratch
             # namespace and hope it is reachable.
-            refspec = f"refs/heads/*:{QUAL_REFS}*"
+            refspec = f"refs/heads/*:{SCRATCH}*"
         else:
             refspec = revision
         fetch = ["fetch", "-f"] + self._git_quiet
@@ -531,7 +524,7 @@ class Update(MemberCommand):
         if sha_like:
             # An all-hex branch name misdetected as a SHA is not an object id, but its tip was just
             # fetched into the scratch namespace; prefer the ref, as git does for ambiguous names.
-            for candidate in (f"{QUAL_REFS}{revision}", revision):
+            for candidate in (f"{SCRATCH}{revision}", revision):
                 result = member.git(
                     ["rev-parse", f"{candidate}^{{commit}}"],
                     check=False,
@@ -550,29 +543,6 @@ class Update(MemberCommand):
         # peeled inside a refspec.
         return member.sha("FETCH_HEAD")
 
-    def _clean_scratch_refs(self, member: Member):
-        # Best-effort: this also runs while an exception unwinds, and a cleanup failure must not
-        # mask it; anything left over is removed by the next update of the same member.
-        listing = member.git(
-            ["for-each-ref", "--format", "%(refname)", QUAL_REFS],
-            check=False,
-            capture_stdout=True,
-            capture_stderr=True,
-        )
-        if listing.returncode != 0:
-            return
-        # Scratch refs mirror the remote's branch names, which are not necessarily valid UTF-8;
-        # decoding as os.fsdecode does keeps the bytes intact, so the deletion below names the very
-        # ref that was listed.
-        for ref in os.fsdecode(listing.stdout).splitlines():
-            if ref:
-                member.git(
-                    ["update-ref", "-d", ref],
-                    check=False,
-                    capture_stdout=True,
-                    capture_stderr=True,
-                )
-
     def _head_ok(self, member: Member) -> bool:
         return member.git(["show-ref", "--quiet", "--head", "/"], check=False).returncode == 0
 
@@ -582,7 +552,7 @@ class Update(MemberCommand):
             member.git(["checkout", "-q", "--detach", QUAL_MANIFEST_REV])
             return
 
-        branch = _decode_ref(
+        branch = decode_ref(
             member.git(
                 ["rev-parse", "--abbrev-ref", "HEAD"],
                 capture_stdout=True,
@@ -591,7 +561,7 @@ class Update(MemberCommand):
         # "HEAD" is what git prints for a detached HEAD; it prints nothing at all when a ref named
         # HEAD (e.g. a tag) makes the name ambiguous, which is a detached HEAD just the same.
         detached = branch in ("HEAD", "")
-        shown = _printable(branch)
+        shown = printable(branch)
 
         if not detached and self.args.keep_descendants and (member.is_ancestor_of(sha, branch)):
             self.small_banner(f'{member.name}: left descendant branch "{shown}" checked out')

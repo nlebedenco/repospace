@@ -53,8 +53,13 @@ def run_git(
     capture_stdout: bool = False,
     capture_stderr: bool = False,
     env_extra: Optional[dict] = None,
+    stdin_data: Optional[bytes] = None,
 ) -> subprocess.CompletedProcess:
-    """Run git with *args*, the single choke point for all git invocations."""
+    """Run git with *args*, the single choke point for all git invocations.
+
+    *stdin_data* feeds the subcommands that read a batch of work from standard input, such as
+    "update-ref --stdin"; git's own stdin is inherited when it is None.
+    """
     cmd = [git_executable()] + [os.fspath(a) for a in args]
     env = None
     if env_extra:
@@ -64,6 +69,7 @@ def run_git(
         cmd,
         cwd=None if cwd is None else os.fspath(cwd),
         check=check,
+        input=stdin_data,
         stdout=subprocess.PIPE if capture_stdout else None,
         stderr=subprocess.PIPE if capture_stderr else None,
         env=env,

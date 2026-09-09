@@ -30,7 +30,7 @@ import subprocess
 from collections import deque
 from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import yaml
 
@@ -45,8 +45,15 @@ _logger = logging.getLogger(__name__)
 MANIFEST_FILE = "repospace.yaml"
 
 #: Highest manifest schema version this repospace understands.
-SCHEMA_VERSION = "1.0"
+#:
+#: MAINTAINERS: this is the major.minor of the repospace release that last changed the manifest
+#: format, so it never runs ahead of repospace.__version__ and is left alone by a release that adds
+#: no manifest feature. Bumping it means adding the new value to _VALID_SCHEMA_VERSIONS below.
+SCHEMA_VERSION = "0.2"
 
+#: Every schema version this repospace accepts, newest last. A version is valid only by being on
+#: this list: releases that changed nothing in the manifest format have no schema version of their
+#: own, so an unlisted value is a typo rather than an older schema.
 _VALID_SCHEMA_VERSIONS = (SCHEMA_VERSION,)
 
 #: Local branch owned by repospace, pointing at each member's manifest revision as of the last
@@ -61,6 +68,11 @@ QUAL_REFS = "refs/repospace/"
 
 #: Index of the ManifestMember in Manifest.members.
 MANIFEST_MEMBER_INDEX = 0
+
+#: Name of the manifest repository, reserved so that no member can take it. It is also what
+#: Member.declared_by holds for a member the manifest repository declares itself (in its manifest
+#: file and the files that file self-imports), as opposed to one an imported member declares.
+MANIFEST_MEMBER_NAME = "manifest"
 
 _DEFAULT_REVISION = "main"
 _MAX_IMPORT_DEPTH = 50
@@ -127,6 +139,77 @@ class Submodule:
     name: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class RefPatterns:
+    """Branch and tag name patterns; see util.ref_patterns_match for how a list is read."""
+
+    heads: Tuple[str, ...]
+    tags: Tuple[str, ...]
+
+
+#: Default "upstream: mirror:" selection: every branch and every tag. Spelled "**", not "*": a
+#: single star stays within one "/"-separated component, so it would leave "release/1.0" unselected
+#: (and therefore pruned from origin).
+MIRROR_ALL = RefPatterns(("**",), ("**",))
+
+#: Default "upstream: preserve:" selection: nothing.
+PRESERVE_NONE = RefPatterns((), ())
+
+
+@dataclass(frozen=True)
+class Upstream:
+    """A member's upstream repository and the ref selection the mirror command applies."""
+
+    url: str
+    mirror: RefPatterns = MIRROR_ALL
+    preserve: RefPatterns = PRESERVE_NONE
+
+    def __post_init__(self):
+        """Refuse a "mirror: heads" that selects no branch however the refs turn out.
+
+        Upstream always has a default branch, so a mirror is always for at least one branch, and
+        "selected" is what the whole command is built on -- with --prune it means "delete every
+        branch origin has". Two spellings select nothing whatever upstream holds, and both are
+        refused here: an empty list, and a list of nothing but "!" exclusions, which only ever take
+        away from what another pattern selected. No manifest can spell either -- _check_ref_patterns
+        refuses them -- so the values are unloadable as well as meaningless, and the constructor is
+        where that becomes impossible rather than merely unlikely.
+
+        The other three lists may be empty. "mirror: tags: []" is a fork that wants none of
+        upstream's tags, and each list defaulting to "**" on its own leaves no other way to say so;
+        an empty "preserve" is the default, and it means what it says.
+        """
+        if not self.mirror.heads:
+            raise MalformedManifest(
+                f'upstream {self.url}: "mirror: heads" is empty; '
+                "a mirror selects no branch without at least one pattern"
+            )
+        if not util.has_positive_ref_pattern(self.mirror.heads):
+            raise MalformedManifest(
+                f'upstream {self.url}: "mirror: heads" holds only exclusions; '
+                'a mirror selects no branch without a pattern that does not begin with "!"'
+            )
+
+    def as_dict(self) -> dict:
+        """Return this upstream as manifest data, omitting the lists left at their defaults."""
+        data: Dict[str, Any] = {"url": self.url}
+        for key, patterns, default in (
+            ("mirror", self.mirror, MIRROR_ALL),
+            ("preserve", self.preserve, PRESERVE_NONE),
+        ):
+            lists = {}
+            for name, value, fallback in (
+                ("heads", patterns.heads, default.heads),
+                ("tags", patterns.tags, default.tags),
+            ):
+                if value == fallback:
+                    continue
+                lists[name] = list(value)
+            if lists:
+                data[key] = lists
+        return data
+
+
 def is_group(value: Any) -> bool:
     """Return True if *value* is a valid group name.
 
@@ -176,6 +259,7 @@ class Member:
         userdata: Any = None,
         description: Optional[str] = None,
         declared_by: Optional[str] = None,
+        upstream: Optional[Upstream] = None,
     ):
         self.name = name
         self.url = url
@@ -193,6 +277,7 @@ class Member:
         self.userdata = userdata
         self.description = description
         self.declared_by = declared_by
+        self.upstream = upstream
 
     def __repr__(self):
         return f'Member("{self.name}", path="{self.path}")'
@@ -219,6 +304,7 @@ class Member:
         capture_stdout: bool = False,
         capture_stderr: bool = False,
         cwd=None,
+        stdin_data: Optional[bytes] = None,
     ) -> subprocess.CompletedProcess:
         """Run git in this member's repository."""
         where = cwd if cwd is not None else self.abspath
@@ -230,6 +316,7 @@ class Member:
             check=check,
             capture_stdout=capture_stdout,
             capture_stderr=capture_stderr,
+            stdin_data=stdin_data,
         )
 
     def is_cloned(self) -> bool:
@@ -259,6 +346,7 @@ class Member:
         return result.stdout.decode().strip()
 
     def is_ancestor_of(self, rev1: str, rev2: str) -> bool:
+        """Say whether *rev1* is an ancestor of *rev2*; a revision git cannot resolve is not."""
         result = self.git(["merge-base", "--is-ancestor", rev1, rev2], check=False)
         return result.returncode == 0
 
@@ -276,6 +364,8 @@ class Member:
         data["revision"] = self.revision
         if self.path != self.name:
             data["path"] = self.path
+        if self.upstream is not None:
+            data["upstream"] = self.upstream.as_dict()
         if self.clone_depth is not None:
             data["clone-depth"] = self.clone_depth
         if self.extension_commands:
@@ -314,7 +404,7 @@ class ManifestMember(Member):
         userdata: Any = None,
     ):
         super().__init__(
-            "manifest",
+            MANIFEST_MEMBER_NAME,
             url=None,
             revision=None,
             path=path,
@@ -364,8 +454,19 @@ _MEMBER_KEYS = frozenset(
         "import",
         "groups",
         "userdata",
+        "upstream",
     }
 )
+_UPSTREAM_KEYS = frozenset({"remote", "repo-path", "url", "mirror", "preserve"})
+#: The two ref namespaces "mirror" and "preserve" name. A tuple, not a set: _check_ref_patterns also
+#: iterates it to check the values, and the order it reports two bad lists in must not depend on how
+#: the strings happened to hash.
+_REF_PATTERN_KEYS = ("heads", "tags")
+#: Keys naming a repository, on a member and on its "upstream" alike. An explicit null and an empty
+#: string are the same editing artifact here -- both would silently fall back to a default, or crash
+#: path derivation -- so both get the same advice rather than a null being reported as a type error.
+_REPO_KEYS = ("remote", "repo-path", "url")
+_VALUE_HINT = "remove the key or set a value"
 _SELF_KEYS = frozenset({"name", "extension-commands", "cmake-packages", "import", "userdata"})
 _IMPORT_MAP_KEYS = frozenset(
     {
@@ -400,20 +501,24 @@ def _check_version(mdata: dict, where: str) -> None:
     _check_null_keys(mdata, ("version",), where)
     raw = mdata["version"]
     version = str(raw)
-    if version in _VALID_SCHEMA_VERSIONS:
-        return
     parsed = _version_tuple(version)
     supported = _version_tuple(SCHEMA_VERSION)
-    # Compare zero-padded so "1.0.0" and "1" mean schema 1.0, not a newer or invalid version.
+    # Too new is reported before anything else, so that a file from a later repospace is answered
+    # with "upgrade" rather than with a list of versions that cannot contain what it asks for. The
+    # comparison is zero-padded to a common length, so "0.2.0" is not read as newer than "0.2".
     width = max(len(parsed), len(supported))
     padded = parsed + (0,) * (width - len(parsed))
-    if parsed:
-        if padded > supported + (0,) * (width - len(supported)):
-            raise ManifestVersionError(version, where)
-        if padded[: len(supported)] == supported:
-            return
+    if parsed and padded > supported + (0,) * (width - len(supported)):
+        raise ManifestVersionError(version, where)
+    # Anything else has to name a version this repospace actually speaks. Spellings that merely
+    # compare equal ("0.2.0") are rejected too: one version, one way to write it.
+    if version in _VALID_SCHEMA_VERSIONS:
+        return
     hint = "" if isinstance(raw, str) else "; do you need to quote the value?"
-    raise MalformedManifest(f'{where}: invalid manifest version "{version}"{hint}')
+    valid = ", ".join(_VALID_SCHEMA_VERSIONS)
+    raise MalformedManifest(
+        f'{where}: invalid manifest version "{version}"; must be one of: {valid}{hint}'
+    )
 
 
 def _expect(condition: bool, message: str) -> None:
@@ -431,8 +536,8 @@ def _key_list(keys) -> List[str]:
     return sorted(str(key) for key in keys)
 
 
-def _check_keys(mapping: dict, allowed: frozenset, where: str) -> None:
-    unknown = set(mapping) - allowed
+def _check_keys(mapping: dict, allowed: Iterable[str], where: str) -> None:
+    unknown = set(mapping).difference(allowed)
     _expect(not unknown, f"{where}: unknown key(s): {_key_list(unknown)}")
 
 
@@ -469,7 +574,7 @@ def _check_cmake_packages(value: Any, where: str) -> None:
         )
 
 
-def _refname_defect(value: str) -> Optional[str]:
+def _refname_defect(value: str, allow_glob: bool = False) -> Optional[str]:
     """Say what keeps *value* from being a git refname, or return None.
 
     These are git-check-ref-format's character rules. A revision reaches git as a fetch refspec and
@@ -477,9 +582,14 @@ def _refname_defect(value: str) -> Optional[str]:
     refspec's source from its destination (a manifest could then move any local branch of the
     member), "*" makes it a pattern, "^", "~", ".." and "@{" are revision operators, "?", "[" and
     "\\" are glob syntax, and whitespace or control characters split or hide the argument.
+
+    With *allow_glob*, "?", "*" and "[" pass: an upstream ref pattern is matched by repospace itself
+    and never handed to git. "\\" stays refused, as no refname contains one and the patterns have
+    no escape syntax.
     """
+    refused = " ~^:\\" if allow_glob else " ~^:?*[\\"
     for char in value:
-        if char in " ~^:?*[\\" or ord(char) < 0x20 or ord(char) == 0x7F:
+        if char in refused or ord(char) < 0x20 or ord(char) == 0x7F:
             return f"contains {char!r}"
     for sequence in ("..", "@{"):
         if sequence in value:
@@ -519,6 +629,86 @@ def _check_revision(value: Any, where: str) -> None:
     raise MalformedManifest(
         f'{where}: revision "{value}" is not a string; do you need to quote the value?'
     )
+
+
+def _check_ref_patterns(value: Any, where: str, allow_empty: Sequence[str] = ()) -> None:
+    """Check the shape of an "upstream: mirror" or "upstream: preserve" value.
+
+    A key named by *allow_empty* may be spelled as an empty list; see Upstream.__post_init__ for
+    which one is, and why the others are not.
+
+    A pattern may begin with "!", which excludes what it matches from what the patterns before it
+    selected (see util.ref_patterns_match). The marker is stripped before the name below it is
+    checked, so an exclusion is held to the same rules as any other pattern -- and a list of
+    nothing but exclusions is refused, since it selects nothing whatever refs exist.
+    """
+    _expect(isinstance(value, dict), f"{where} is not a mapping")
+    _check_keys(value, _REF_PATTERN_KEYS, where)
+    _check_null_keys(value, _REF_PATTERN_KEYS, where)
+    for key in _REF_PATTERN_KEYS:
+        if key not in value:
+            continue
+        patterns = value[key]
+        empty_ok = key in allow_empty
+        _expect(
+            isinstance(patterns, list)
+            and (empty_ok or len(patterns) > 0)
+            and all(isinstance(p, str) for p in patterns),
+            f'{where}: "{key}" is not a {"" if empty_ok else "non-empty "}list of strings',
+        )
+        for pattern in patterns:
+            if not pattern:
+                raise MalformedManifest(
+                    f'{where}: "{key}" has an empty pattern; remove it or set a value'
+                )
+            _, body = util.split_ref_pattern(pattern)
+            if not body:
+                raise MalformedManifest(
+                    f'{where}: "{key}" has a pattern that is only "{util.NEGATION}"; '
+                    "an exclusion needs a pattern to exclude"
+                )
+            defect = _refname_defect(body, allow_glob=True)
+            if defect is not None:
+                raise MalformedManifest(
+                    f'{where}: "{key}" pattern "{pattern}" {defect}; '
+                    "this is not a valid ref pattern"
+                )
+        if patterns and not util.has_positive_ref_pattern(patterns):
+            # Caught here rather than left to the run: an exclusion only takes away from what
+            # another pattern selected, so a list of nothing else selects nothing at all -- for
+            # "mirror" that is a member the run refuses, and for "preserve" it is the default
+            # written out at length.
+            hint = ", or write it as [] to select nothing" if empty_ok else ""
+            raise MalformedManifest(
+                f'{where}: "{key}" holds only exclusions, so it selects nothing; '
+                f'add a pattern that does not begin with "{util.NEGATION}"{hint}'
+            )
+
+
+def _check_upstream(value: Any, where: str) -> None:
+    """Check the shape of a member "upstream" value without resolving its URL."""
+    _expect(isinstance(value, dict), f'{where}: "upstream" is not a mapping')
+    here = f"{where}: upstream"
+    _check_keys(value, _UPSTREAM_KEYS, here)
+    _check_null_keys(
+        value,
+        _REPO_KEYS + ("mirror", "preserve"),
+        here,
+        hints=dict.fromkeys(_REPO_KEYS, _VALUE_HINT),
+    )
+    for key in _REPO_KEYS:
+        if key in value:
+            _expect(isinstance(value[key], str), f'{here}: "{key}" is not a string')
+            if value[key] == "":
+                raise MalformedManifest(f'{here}: "{key}" is empty; {_VALUE_HINT}')
+    for key in ("mirror", "preserve"):
+        if key in value:
+            # Only "mirror: tags" may be an empty list; the other three have nothing to say.
+            _check_ref_patterns(
+                value[key],
+                f"{here}: {key}",
+                allow_empty=("tags",) if key == "mirror" else (),
+            )
 
 
 def _check_member_import(
@@ -652,7 +842,9 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
             here = f"{where}: member {name}"
             # String keys use presence checks so an explicit null is an error: it would otherwise
             # crash path joining or coerce to the literal revision "None".
-            for key in ("description", "remote", "repo-path", "url", "path"):
+            string_keys = ("description",) + _REPO_KEYS + ("path",)
+            _check_null_keys(md, string_keys, here, hints=dict.fromkeys(string_keys, _VALUE_HINT))
+            for key in string_keys:
                 if key in md:
                     _expect(
                         isinstance(md[key], str),
@@ -660,11 +852,9 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
                     )
             # An empty string would silently fall back to a default (or crash path derivation);
             # reject it like an explicit null.
-            for key in ("remote", "repo-path", "url", "path"):
+            for key in _REPO_KEYS + ("path",):
                 if key in md and md[key] == "":
-                    raise MalformedManifest(
-                        f'{here}: "{key}" is empty; remove the key or set a value'
-                    )
+                    raise MalformedManifest(f'{here}: "{key}" is empty; {_VALUE_HINT}')
             _check_null_keys(
                 md,
                 (
@@ -674,6 +864,7 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
                     "cmake-packages",
                     "import",
                     "groups",
+                    "upstream",
                 ),
                 here,
                 hints={
@@ -683,6 +874,8 @@ def validate(source: Union[str, dict], where: str = "manifest data") -> dict:
             )
             if "import" in md:
                 _check_member_import(md["import"], here)
+            if "upstream" in md:
+                _check_upstream(md["upstream"], here)
             depth = md.get("clone-depth")
             _expect(
                 depth is None
@@ -889,6 +1082,77 @@ class _Branch:
 class _Defaults:
     remote: Optional[str]
     revision: str
+
+
+def _resolve_url(
+    md: dict, name: str, url_bases: dict, default_remote: Optional[str], where: str
+) -> str:
+    """Return the URL *md* declares as "url", or as "remote" plus "repo-path" (default *name*).
+
+    Without either, the default remote applies. Shared by members and their "upstream" so that
+    both spell a repository the same way.
+    """
+    url = md.get("url")
+    remote = md.get("remote")
+    repo_path = md.get("repo-path")
+    if remote and url:
+        raise MalformedManifest(f'{where} has both "remote: {remote}" and "url: {url}"')
+    if default_remote and not (remote or url):
+        remote = default_remote
+    if url:
+        if repo_path:
+            raise MalformedManifest(f'{where} has both "repo-path: {repo_path}" and "url: {url}"')
+        return url
+    if remote:
+        if remote not in url_bases:
+            raise MalformedManifest(f"{where}: remote {remote} is not defined")
+        return url_bases[remote].rstrip("/") + "/" + (repo_path or name)
+    raise MalformedManifest(f"{where} has no remote or url and no default remote is set")
+
+
+def _load_ref_patterns(raw: Optional[dict], default: RefPatterns) -> RefPatterns:
+    if raw is None:
+        return default
+    return RefPatterns(
+        tuple(raw.get("heads", default.heads)),
+        tuple(raw.get("tags", default.tags)),
+    )
+
+
+def _same_repository(one: str, other: str) -> bool:
+    """Say whether two git URLs are two spellings of the same repository.
+
+    Only the spellings git itself treats as interchangeable are normalized away: a trailing "/" and
+    the conventional ".git" suffix. Two URLs reaching one repository over different transports
+    (scp-like "git@host:org/a" against "ssh://git@host/org/a") still read as different, so a True
+    here is proof of sameness while a False is not proof of distinctness.
+    """
+
+    def normalized(url: str) -> str:
+        trimmed = url.rstrip("/")
+        return trimmed[: -len(".git")] if trimmed.endswith(".git") else trimmed
+
+    return normalized(one) == normalized(other)
+
+
+def _load_upstream(
+    data: dict, name: str, member_url: str, url_bases: dict, defaults: _Defaults, where: str
+) -> Upstream:
+    here = f"{where}: upstream"
+    url = _resolve_url(data, name, url_bases, defaults.remote, here)
+    # Compared by repository, not by spelling: a member mirroring itself force-overwrites its own
+    # refs, and with --prune deletes the ones a narrowed "mirror" leaves unselected. A trailing "/"
+    # or a ".git" the two urls do not share must not be all it takes to get past this.
+    if _same_repository(url, member_url):
+        raise MalformedManifest(
+            f"{here}: url {url} is the member's own url; "
+            "an upstream must be a different repository"
+        )
+    return Upstream(
+        url,
+        mirror=_load_ref_patterns(data.get("mirror"), MIRROR_ALL),
+        preserve=_load_ref_patterns(data.get("preserve"), PRESERVE_NONE),
+    )
 
 
 def _check_import_cycle(key, label: str, branch: _Branch) -> None:
@@ -1159,7 +1423,7 @@ class Manifest:
         if abspath is not None:
             chain = (((None, os.path.realpath(abspath)), abspath),)
         top_branch = _Branch(
-            origin="manifest",
+            origin=MANIFEST_MEMBER_NAME,
             origin_member=None,
             repo_abspath=repo_abspath,
             imap_filter=None,
@@ -1187,7 +1451,7 @@ class Manifest:
         )
         self.members: List[Member] = list(shared.members.values())
         self.members.insert(MANIFEST_MEMBER_INDEX, manifest_member)
-        self._members_by_name: Dict[str, Member] = {"manifest": manifest_member}
+        self._members_by_name: Dict[str, Member] = {MANIFEST_MEMBER_NAME: manifest_member}
         self._members_by_name.update(shared.members)
 
         self._check_paths_are_unique()
@@ -1612,9 +1876,9 @@ class Manifest:
         name = md["name"]
         where = f"{branch.where}: member {name}"
 
-        if name == "manifest":
+        if name == MANIFEST_MEMBER_NAME:
             raise MalformedManifest(
-                f'{branch.where}: no member can be named "manifest"; '
+                f'{branch.where}: no member can be named "{MANIFEST_MEMBER_NAME}"; '
                 "the name is reserved for the manifest repository"
             )
         if "/" in name or "\\" in name:
@@ -1627,24 +1891,10 @@ class Manifest:
                 "or a comma; this is discouraged"
             )
 
-        url = md.get("url")
-        remote = md.get("remote")
-        repo_path = md.get("repo-path")
-        if remote and url:
-            raise MalformedManifest(f'{where} has both "remote: {remote}" and "url: {url}"')
-        if defaults.remote and not (remote or url):
-            remote = defaults.remote
-        if url:
-            if repo_path:
-                raise MalformedManifest(
-                    f'{where} has both "repo-path: {repo_path}" and "url: {url}"'
-                )
-        elif remote:
-            if remote not in url_bases:
-                raise MalformedManifest(f"{where}: remote {remote} is not defined")
-            url = url_bases[remote].rstrip("/") + "/" + (repo_path or name)
-        else:
-            raise MalformedManifest(f"{where} has no remote or url and no default remote is set")
+        url = _resolve_url(md, name, url_bases, defaults.remote, where)
+        upstream = None
+        if "upstream" in md:
+            upstream = _load_upstream(md["upstream"], name, url, url_bases, defaults, where)
 
         # A path-prefix in the member's own "import" scopes only to the imported content; the
         # member's placement is its declaring file's prefix plus "path". The result is normalized
@@ -1684,6 +1934,7 @@ class Manifest:
             userdata=md.get("userdata"),
             description=md.get("description"),
             declared_by=branch.origin,
+            upstream=upstream,
         )
 
         # Purely lexical path checks; the filesystem is consulted later, by

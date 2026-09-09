@@ -27,7 +27,7 @@ Add a `repospace.yaml` to the root of your project (the manifest repository):
 
 ```yaml
 manifest:
-  version: '1.0'
+  version: '0.2'
   remotes:
     - name: upstream
       url-base: https://example.com/repos
@@ -86,6 +86,7 @@ repository's `.gitignore`.
 |------------|--------------------------------------------------------------------|
 | `init`     | create a repospace in place or by cloning a manifest repository    |
 | `update`   | update members to their manifest revisions                         |
+| `mirror`   | push selected upstream branches and tags to members' origin        |
 | `list`     | print information about members, including staleness flags         |
 | `manifest` | `--resolve`, `--freeze`, `--validate`, or `--path` of the manifest |
 | `compare`  | compare member checkouts against the manifest                      |
@@ -124,6 +125,11 @@ Notes:
 
 - `repospace update` never deletes directories. A member removed from the
   manifest stays on disk; `repospace list` warns about it.
+
+- `repospace mirror` is the only command that writes to a remote. It pushes
+  the upstream branches and tags a member's `upstream` attribute selects to
+  that member's `origin`. Deleting the origin refs it does not select is
+  opt-in, with `repospace mirror --prune`.
 
 - Extension commands execute code from cloned repositories. Only use manifests
   you trust, or disable extensions with `repospace config
@@ -240,13 +246,13 @@ or depends on Zephyr.
 | Tool directory        | `.west/`                                                                                                              | `.repospace/`                                             |
 | Managed repositories  | `projects`                                                                                                            | `members`                                                 |
 | Manifest sections     | `version`, `defaults`, `remotes`, `self`, `group-filter`                                                              | same names                                                |
-| Repository attributes | `name`, `path`, `url`, `remote`, `repo-path`, `revision`, `clone-depth`, `groups`, `submodules`, `userdata`, `import` | same names                                                |
+| Repository attributes | `name`, `path`, `url`, `remote`, `repo-path`, `revision`, `clone-depth`, `groups`, `submodules`, `userdata`, `import` | same names, plus `upstream`                               |
 | Recursive imports     | `import` with `name-allowlist`, `name-blocklist`, `path-allowlist`, `path-blocklist`, `path-prefix`                   | same names                                                |
 | Group filters         | manifest `group-filter` plus the `manifest.group-filter` option                                                       | same                                                      |
 | Revision bookkeeping  | branch `manifest-rev`, detached `HEAD`                                                                                | branch `repospace-rev`, detached `HEAD`                   |
 | Extension commands    | `west-commands` attribute, `west-commands.yml`                                                                        | `extension-commands` attribute, `repospace-commands.yaml` |
 | Configuration         | git-style INI at system, global and local levels                                                                      | same, with `REPOSPACE_CONFIG_*` overrides                 |
-| Built-in commands     | `init`, `update`, `list`, `manifest`, `compare`, `diff`, `status`, `forall`, `grep`, `config`, `topdir`, `help`       | same set                                                  |
+| Built-in commands     | `init`, `update`, `list`, `manifest`, `compare`, `diff`, `status`, `forall`, `grep`, `config`, `topdir`, `help`       | same set, plus `mirror`                                   |
 | Command options       | `--freeze`, `--resolve`, `--validate`, `--narrow`, `--rebase`, `--keep-descendants`, `--group-filter`, `--fetch`      | same names                                                |
 
 ### Main differences

@@ -655,6 +655,35 @@ def test_update_sha_only_member(repospace, run_repospace, repos):
     assert git_out(pinned, "for-each-ref", "refs/repospace") == ""
 
 
+def test_update_clears_leftover_scratch_refs_before_the_fetch(repospace, run_repospace, repos):
+    # A run killed between the fetch and the cleanup leaves its scratch refs behind: the "finally"
+    # that clears them does not run when the process is killed. If origin has since turned one of
+    # those names into a directory ("a" renamed to "a/b"), the next fetch cannot create the new
+    # scratch ref while the old one is in the way -- a ref and a directory of the same name cannot
+    # both exist -- so clearing the namespace only afterwards would cost a failed run first.
+    from repospace.app.update import SCRATCH
+
+    src = repos.create("scratch-src", {"s.txt": "s\n"})
+    repos.branch(src, "a")
+    sha = repos.head(src)
+    repospace.rewrite_app_yaml(
+        extra_members=(
+            "    - name: pinned\n" f"      url: {repospace.url(src)}\n" f"      revision: {sha}\n"
+        )
+    )
+    update(run_repospace, repospace)
+    pinned = repospace.ws / "pinned"
+    subprocess.run(["git", "-C", str(pinned), "update-ref", f"{SCRATCH}a", sha], check=True)
+    subprocess.run(["git", "-C", str(src), "branch", "-m", "a", "a/b"], check=True)
+
+    # A sha-like revision is fetched as "refs/heads/*:<scratch>*", so the rename is what the
+    # leftover collides with; "always" is what makes this run fetch at all.
+    update(run_repospace, repospace, "--fetch", "always")
+
+    assert git_out(pinned, "rev-parse", "HEAD") == sha
+    assert git_out(pinned, "for-each-ref", "refs/repospace") == ""
+
+
 def test_update_unreachable_sha_fails(repospace, run_repospace, repos):
     lost_src = repos.create("lost-src", {"l.txt": "l\n"})
     repospace.rewrite_app_yaml(
@@ -998,8 +1027,8 @@ def test_update_rejects_toplevel_symlink(repospace, run_repospace, repos):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: non-UTF-8 ref names")
 def test_update_non_utf8_branch_name(repospace, run_repospace):
-    # git ref names are byte strings that need not be valid UTF-8. One member checked out on such a
-    # branch must not take down its own update, nor the other members'.
+    # git ref names are byte strings that do not have to be valid UTF-8. One member checked out on
+    # such a branch must not take down its own update, nor the other members'.
     update(run_repospace, repospace)
     libb = repospace.ws / "libb"
     subprocess.run(

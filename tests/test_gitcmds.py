@@ -12,7 +12,7 @@ import pytest
 
 import yaml
 
-from repospace.manifest import QUAL_MANIFEST_REV
+from repospace.manifest import QUAL_MANIFEST_REV, SCHEMA_VERSION
 
 
 @pytest.fixture
@@ -169,7 +169,7 @@ def test_manifest_resolve(updated, run_repospace):
     out, _ = run(run_repospace, updated, "manifest", "--resolve")
     data = yaml.safe_load(out)
     mdata = data["manifest"]
-    assert mdata["version"] == "1.0"
+    assert mdata["version"] == SCHEMA_VERSION
     members = {m["name"]: m for m in mdata["members"]}
     assert set(members) == {"liba", "libb", "libc"}
     assert "import" not in members["liba"]

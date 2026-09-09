@@ -9,7 +9,7 @@ file with `import: file:`. All sections are optional:
 
 ```yaml
 manifest:
-  version: '1.0'
+  version: '0.2'
   defaults:
     remote: upstream
     revision: main
@@ -45,11 +45,24 @@ The installed package ships the same file under the environment prefix, as
 ## version
 
 The minimum schema version required to parse the file, as a string (quote it —
-YAML would otherwise parse `1.0` as a number, which is tolerated but warned
-about in errors). The current schema version is `1.0`. A manifest declaring a
-newer version than the running repospace supports fails with an error asking to
-upgrade repospace. The version is checked per file, including imported ones,
-before anything else.
+YAML would otherwise parse `0.2` as a number, which is tolerated but warned
+about in errors; `0.10` unquoted is the number `0.1`, a different version).
+
+A schema version is the `major.minor` of the repospace release that last changed
+the manifest format, so a release adding no manifest feature has no schema
+version of its own. The current, and so far only, schema version is `0.2`, which
+shipped with repospace 0.2.0.
+
+The value must name a released schema version exactly. A newer one fails with an
+error asking to upgrade repospace — that is what the key buys. Anything else,
+including a spelling that merely compares equal such as `0.2.0`, is rejected as
+invalid with the list of versions this repospace accepts.
+
+The declared version is not a claim repospace checks the file against: nothing
+verifies that a file declaring an older version restricts itself to what that
+version offered. It only says which repospace can read the file.
+
+The version is checked per file, including imported ones, before anything else.
 
 ## defaults
 
@@ -94,6 +107,7 @@ Each entry accepts:
 | `cmake-packages`     | string or list   | none                | CMake package names whose `<name>_ROOT` should point at this member                                                  |
 | `import`             | see below        | none                | Import the member's own manifest(s)                                                                                  |
 | `groups`             | list             | `[]`                | Group membership (mutually exclusive with `import`)                                                                  |
+| `upstream`           | mapping          | none                | The repository this member's origin forks, and the refs `repospace mirror` keeps equal to it (see below)             |
 | `userdata`           | any              | none                | Ignored by repospace                                                                                                 |
 
 Member paths are confined to the repospace: absolute paths, drive letters, `..`
@@ -111,6 +125,129 @@ nor one committed in the manifest repository can redirect a checkout elsewhere.
 Components that do not exist yet are fine; `update` creates them as directories.
 The repospace top itself, and anything above it, may be a symlink: that
 placement is the user's own doing, not something manifest data can steer.
+
+### upstream
+
+A member with an `upstream` declares that its own repository — `origin`, the one
+its `url` names — is a fork of that upstream. As independent maintainers work
+on upstream we can use `repospace mirror` to push branches and tags from there
+into `origin`.
+
+```yaml
+members:
+  - name: foobar
+    url: git@github.com:me/foobar
+    upstream:
+      url: git@github.com:joedoe/foobar
+      mirror:
+        heads: [main, 'release/*']
+        tags: ['v[0-9]*']
+      preserve:
+        heads: ['forked/*']
+        tags: ['forked/*']
+```
+
+The upstream repository is named exactly as a member is — `url`, or `remote`
+plus `repo-path` (default: the member name), falling back to `defaults.remote` —
+and must resolve to a URL different from the member's own.
+
+`mirror` selects what is copied from upstream, `preserve` what belongs to
+`origin` alone; each takes `heads` and `tags` lists of patterns, and each list
+left out keeps its default. `mirror` defaults to every branch and every tag,
+`preserve` to nothing.
+
+`mirror: tags: []` is the one list that may be written empty, and it mirrors no
+tag at all — the only way to say so, since leaving the key out mirrors every tag
+instead. `mirror: heads` may not: upstream always has a default branch, so a
+mirror is always for at least one.
+
+A mirror run pushes to `origin` every upstream branch its `mirror: heads`
+patterns select and its `preserve: heads` patterns do not, and every upstream
+tag its `mirror: tags` patterns select and its `preserve: tags` patterns do not.
+`preserve` always wins
+over `mirror`: a preserved ref is never pushed to, even where upstream has a ref
+of the same name, so work that exists only on `origin` is never overwritten by
+an upstream ref that collides with it. Mirrored refs, on the other hand, belong
+to upstream: they are force-updated, and any commit `origin` alone held on one
+of them is dropped.
+
+Deleting is opt-in. With `repospace mirror --prune`, every `origin` branch and
+tag that is neither selected by `mirror` nor selected by `preserve` is deleted,
+so `origin` ends up holding exactly the selected upstream refs plus the
+preserved ones; that also removes refs an earlier run mirrored under wider
+patterns, and upstream refs the patterns no longer select. Without `--prune`
+such refs are left alone, so a `mirror` list narrower than what `origin` holds —
+including one narrowed by accident, since each of `heads` and `tags` defaults to
+`**` on its own — costs nothing until the deletion is asked for.
+
+A pattern is matched by repospace against the whole ref name below `refs/heads/`
+or `refs/tags/` (`main`, `release/1.0`, `v1.2`), following gitignore's rules:
+
+- `*` and `?` match within one `/`-separated component.
+
+- `*` matches any run of characters, `?` exactly one.
+
+- `**` spans components, so `**` alone is every name and `release/**` is
+  everything below `release/`.
+
+- `[abc]` is a character class and `[!abc]` its negation, which also excludes
+  `/`.
+
+- `[a-c]` is a range; a reversed one (`[c-a]`) holds nothing.
+
+- an unclosed `[` is a literal, as in a shell glob.
+
+A list of patterns is read as a gitignore file is: a leading `!` excludes what
+the rest of the pattern matches, and the last pattern matching a name is the one
+that decides. So `['**', '!wip/*']` selects every name except the ones below
+`wip/`, and `['**', '!wip/*', 'wip/keep']` selects that one back. An exclusion
+only narrows what another pattern selected, so a list of nothing but exclusions
+selects nothing and is refused; `mirror: tags: []` is how to select nothing on
+purpose.
+
+Only the first `!` is the marker, and the pattern below it reads a `!`
+literally, so `!!x` excludes the ref named `!x`. A pattern that selects has no
+such escape — the language has no escape character — so a ref name beginning
+with `!` is selected only by a pattern that reaches it with a wildcard.
+
+Patterns are never handed to git, so unlike a revision they may hold glob
+syntax; the remaining refname rules still apply (no whitespace, `~`, `^`, `:`,
+`\`, `..` or `@{`, and `@` alone is not a pattern). A qualified pattern such as
+`refs/heads/main` is well formed and matches nothing, since the name it is
+matched against is `main`.
+
+`repospace mirror` refuses a member whose `mirror: heads` matches none of the
+branches upstream has, with or without `--prune`. A mirror is always for at
+least one branch, since upstream always has a default one, so selecting none of
+them mirrors nothing — and under `--prune` it deletes every branch `origin`
+holds that `preserve` does not match, because what tells a ref upstream deleted
+from a ref that only ever existed on `origin` is exclusion: whatever `preserve`
+does not name is taken to be upstream's. Where upstream has no branches at all
+there is nothing to check: no pattern, however wide, could have matched one.
+
+`mirror: tags` is not checked that way, and neither is `preserve`. Upstream may
+define no tag, a fork may want none of the tags it does define, and a `preserve`
+pattern matching nothing is what a fork looks like before it has created the ref
+it means to keep. Each is a use of its own that cannot be told from a mistyped
+pattern, and none of them leaves the mirror with nothing to mirror; `--prune`
+being opt-in and `--dry-run` showing the plan first are what guard them.
+`mirror: tags: []` under `--prune` therefore does delete the tags `origin`
+holds, as the rule above says it does; `preserve: tags` is what keeps a fork's
+own tags out of it.
+
+`repospace mirror --prune` refuses a plan that would delete the branch
+`origin`'s HEAD points at, since a git server rejects that push
+(`receive.denyDeleteCurrent`, which git refuses by default, on bare
+repositories too). Read what it points at with
+`git ls-remote --symref <origin url> HEAD`.
+
+Listing that branch under `preserve: heads` always resolves it. Listing it under
+`mirror: heads` resolves it only when upstream has a branch of that name, since
+what a mirror run pushes is selected from upstream's refs: a branch that exists
+only on `origin` cannot be selected however wide the `mirror` patterns are, and
+is still pruned. The remaining way out is to move HEAD on `origin`, with
+`git symbolic-ref HEAD refs/heads/<branch>` in it, or through the default-branch
+setting of the code-hosting platform serving it.
 
 ## self
 

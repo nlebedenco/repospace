@@ -34,6 +34,7 @@ from repospace.app.gitcmds import Compare, Diff, ForAll, Grep, Status
 from repospace.app.init import Init
 from repospace.app.inspection import List as ListCommand
 from repospace.app.inspection import ManifestCommand, Topdir
+from repospace.app.mirror import Mirror
 from repospace.app.update import Update
 
 #: Commands allowed to run when the manifest cannot be loaded. "update" is included because running
@@ -220,6 +221,7 @@ class RepospaceApp:
             "built-in commands for managing the repospace": [
                 Init(),
                 Update(),
+                Mirror(),
                 ListCommand(),
                 ManifestCommand(),
                 Compare(),

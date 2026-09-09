@@ -442,7 +442,7 @@ def test_command_help_available_with_broken_manifest(run_repospace, tmp_path):
     # manifest is required -- unlike an actual run of the same command.
     ws = make_repospace(tmp_path)
     (ws / "repospace.yaml").write_text("manifest:\n  bogus: 1\n")
-    for name in ("list", "diff", "status", "grep", "forall", "compare"):
+    for name in ("list", "diff", "status", "grep", "forall", "compare", "mirror"):
         code, out, err = run_repospace([name, "-h"], cwd=ws)
         assert code == 0, err
         assert f"usage: repospace {name}" in out

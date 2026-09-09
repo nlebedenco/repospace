@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/nlebedenco/repospace/raw/main/scripts/schemas/repospace-manifest-schema.json",
-  "title": "repospace manifest",
-  "description": "Schema for repospace.yaml, the repospace manifest (YAML parsed to JSON). Checks are lexical: constraints that require path normalization, filesystem state, or cross-references (remote names, default remote presence) are enforced by the tool, not here.",
+  "$id": "https://github.com/nlebedenco/repospace/raw/main/scripts/schemas/manifest-schema.json",
+  "title": "Repospace manifest",
+  "description": "Lexical validation only. Constraints that require path normalization, filesystem state, or cross-references are enforced by the tool.",
   "type": "object",
   "required": ["manifest"],
   "additionalProperties": false,
@@ -12,10 +12,10 @@
       "additionalProperties": false,
       "properties": {
         "version": {
-          "description": "Minimum schema version required to parse the file, as a string (quote it; unquoted 1.0 is a YAML number). The only supported schema version is 1.0.",
+          "description": "Minimum schema version required to parse the file, as a string (quote it; unquoted 0.2 is a YAML number). It must name a released schema version exactly; the only one is 0.2.",
           "anyOf": [
-            { "type": "string", "pattern": "^1(\\.0+)*$" },
-            { "type": "number", "enum": [1] }
+            { "type": "string", "enum": ["0.2"] },
+            { "type": "number", "enum": [0.2] }
           ]
         },
         "defaults": {
@@ -55,7 +55,7 @@
           "additionalProperties": false,
           "properties": {
             "name": {
-              "description": "Suggested clone-directory name, used only by \"repospace init REPOSITORY\" without a DIRECTORY argument. A single plain path component that does not start with a dot.",
+              "description": "Suggested clone-directory name, used by \"repospace init REPOSITORY\" without a DIRECTORY argument. A single plain path component that does not start with a dot.",
               "type": "string",
               "pattern": "^[^./\\\\][^/\\\\]*$"
             },
@@ -111,6 +111,90 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^(?![-+]|@$)(?:(?!\\.\\.|@\\{)[^\\s~^:?*\\[\\\\\\x00-\\x1f\\x7f])+$"
+    },
+    "refPattern": {
+      "description": "Branch or tag name pattern, matched by repospace (never handed to git) against the whole name below refs/heads/ or refs/tags/: \"*\" and \"?\" stay within one \"/\" component, \"**\" spans components, \"[...]\" is a character class and \"[!...]\" its negation. A leading \"!\" excludes what the rest of the pattern matches, and the last pattern matching a ref decides, as in a gitignore file. Refname-safe otherwise: none of whitespace, ~ ^ : \\, \"..\" or \"@{\".",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^!?(?!@$)(?:(?!\\.\\.|@\\{)[^\\s~^:\\\\\\x00-\\x1f\\x7f])+$"
+    },
+    "selectingRefPattern": {
+      "description": "A pattern that selects rather than excludes, i.e. one that does not begin with \"!\".",
+      "pattern": "^[^!]"
+    },
+    "refPatterns": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "heads": {
+          "description": "Branch name patterns. At least one must select, since an exclusion only narrows what another pattern selected.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/refPattern" },
+          "contains": { "$ref": "#/$defs/selectingRefPattern" }
+        },
+        "tags": {
+          "description": "Tag name patterns. At least one must select, since an exclusion only narrows what another pattern selected.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/refPattern" },
+          "contains": { "$ref": "#/$defs/selectingRefPattern" }
+        }
+      }
+    },
+    "mirrorPatterns": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "heads": {
+          "description": "Branch name patterns. At least one, and at least one that selects: a mirror is always for at least one branch, since upstream always has a default one.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/refPattern" },
+          "contains": { "$ref": "#/$defs/selectingRefPattern" }
+        },
+        "tags": {
+          "description": "Tag name patterns. May be empty, which mirrors no tag at all; leaving the key out mirrors every tag instead. A non-empty list must hold at least one pattern that selects.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/refPattern" },
+          "if": { "minItems": 1 },
+          "then": { "contains": { "$ref": "#/$defs/selectingRefPattern" } }
+        }
+      }
+    },
+    "upstream": {
+      "description": "The repository this member is a fork of.",
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        { "not": { "required": ["remote", "url"] } },
+        { "not": { "required": ["url", "repo-path"] } }
+      ],
+      "properties": {
+        "remote": {
+          "description": "Named remote for the upstream URL (mutually exclusive with url).",
+          "type": "string",
+          "minLength": 1
+        },
+        "repo-path": {
+          "description": "Suffix appended to the remote's url-base (default: the member name; mutually exclusive with url).",
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "description": "Complete upstream URL (mutually exclusive with remote and repo-path).",
+          "type": "string",
+          "minLength": 1
+        },
+        "mirror": {
+          "description": "Upstream refs to mirror (default: every branch and every tag).",
+          "$ref": "#/$defs/mirrorPatterns"
+        },
+        "preserve": {
+          "description": "Origin refs that must be preserved. These are never pushed to or deleted by the mirror (default: none).",
+          "$ref": "#/$defs/refPatterns"
+        }
+      }
     },
     "groupName": {
       "description": "Group name, always a string: no leading + or -, no whitespace, commas, or colons. Quote numeric names, or YAML mangles them (1.10 becomes 1.1).",
@@ -211,16 +295,15 @@
           "minLength": 1
         },
         "revision": { "$ref": "#/$defs/revision" },
+        "upstream": { "$ref": "#/$defs/upstream" },
         "path": {
-          "description": "Checkout path relative to the repospace topdir (default: name). POSIX separators; must stay inside the repospace and outside .repospace/, with no .git component (in any case).",
+          "description": "Checkout path (default: name), relative to the path-prefix accumulated by the imports that reached this file, or to the repospace topdir when there is none. The result must stay inside the repospace and outside .repospace/, with no .git component (in any case).",
           "type": "string",
           "minLength": 1,
           "allOf": [
             { "not": { "pattern": "^/" } },
             { "not": { "pattern": "^.:" } },
             { "not": { "pattern": "\\\\" } },
-            { "not": { "pattern": "^\\.\\.(/|$)" } },
-            { "not": { "pattern": "^\\.repospace(/|$)" } },
             { "not": { "pattern": "^\\./?$" } },
             { "not": { "pattern": "(^|/)\\.[gG][iI][tT](/|$)" } }
           ]
