@@ -242,7 +242,7 @@ def test_manifest_out_write_failure_fails_cleanly(updated, run_repospace):
 
 def test_diff_clean_and_dirty(updated, run_repospace):
     out, _ = run(run_repospace, updated, "diff")
-    assert out == ""
+    assert out.splitlines() == ["=== no differences"]
     (updated.ws / "liba" / "liba.txt").write_text("changed\n")
     out, _ = run(run_repospace, updated, "diff")
     assert "diff for liba (liba):" in out
@@ -256,6 +256,40 @@ def test_diff_exit_code_passthrough(updated, run_repospace):
     assert "diff for liba (liba):" in out
     assert "liba/liba.txt" in out
     assert "ERROR" not in err
+
+
+def test_diff_all_states_the_verdict_per_member(updated, run_repospace):
+    # As in "compare -a": a banner with nothing under it is the silence -a was meant to break, so
+    # every member says where it stands, and the run-wide summary steps aside because they did.
+    out, _ = run(run_repospace, updated, "diff", "-a")
+    assert "=== diff for liba (liba): no differences" in out
+    assert "=== diff for libb (libb): no differences" in out
+    assert "=== no differences" not in out
+
+    (updated.ws / "liba" / "liba.txt").write_text("changed\n")
+    # Plain git diff exits 0 whether or not it printed a patch, as test_diff_clean_and_dirty shows.
+    out, _ = run(run_repospace, updated, "diff", "-a")
+    assert "=== diff for liba (liba):" in out
+    assert "liba/liba.txt" in out
+    assert "=== diff for libb (libb): no differences" in out
+
+
+def test_diff_all_verdict_follows_git_not_the_output(updated, run_repospace):
+    # --quiet reports differences without printing them, so an empty patch does not mean a clean
+    # member; the exit status is what the per-member verdict follows.
+    (updated.ws / "liba" / "liba.txt").write_text("changed\n")
+    out, _ = run(run_repospace, updated, "diff", "-a", "--", "--quiet", expect=1)
+    assert "=== diff for liba (liba): differences not shown" in out
+    assert "=== diff for libb (libb): no differences" in out
+
+
+def test_diff_summary_follows_git_not_the_output(updated, run_repospace):
+    # A pass-through flag that reports differences without printing them must not be summarized as
+    # "no differences", which would contradict the exit status.
+    (updated.ws / "liba" / "liba.txt").write_text("changed\n")
+    out, err = run(run_repospace, updated, "diff", "--", "--quiet", expect=1)
+    assert out == ""
+    assert "no differences" not in out
 
 
 def test_diff_relays_repospace_qq(updated, run_repospace):
@@ -278,7 +312,7 @@ def test_diff_dashdash_passes_flags_through(updated, run_repospace):
     # The documented escape: after --, -a belongs to git diff (--text), not to this command (--all),
     # and is not a member name.
     out, err = run(run_repospace, updated, "diff", "--", "-a")
-    assert out == ""
+    assert out.splitlines() == ["=== no differences"]
     assert "unknown member" not in err
     (updated.ws / "liba" / "liba.txt").write_text("changed\n")
     out, _ = run(run_repospace, updated, "diff", "--", "--stat")
@@ -290,7 +324,7 @@ def test_diff_dashdash_passes_flags_through(updated, run_repospace):
 def test_diff_members_precede_dashdash(updated, run_repospace):
     (updated.ws / "liba" / "liba.txt").write_text("changed\n")
     out, _ = run(run_repospace, updated, "diff", "libb", "--", "--stat")
-    assert out == ""
+    assert out.splitlines() == ["=== no differences"]
 
 
 def test_diff_revision_positional_hints_dashdash(updated, run_repospace):
@@ -301,7 +335,7 @@ def test_diff_revision_positional_hints_dashdash(updated, run_repospace):
     assert "unknown member(s): HEAD" in err
     assert 'go after "--"' in err
     out, _ = run(run_repospace, updated, "diff", "--", "HEAD")
-    assert out == ""
+    assert out.splitlines() == ["=== no differences"]
 
 
 def test_diff_signal_death_maps_exit_code(updated, run_repospace, monkeypatch):
@@ -400,6 +434,23 @@ def test_forall_signal_death_maps_exit_code(updated, run_repospace):
 
 def test_compare_clean(updated, run_repospace):
     out, _ = run(run_repospace, updated, "compare")
+    assert out.splitlines() == ["=== all members are up to date"]
+
+
+def test_compare_clean_all_does_not_repeat_itself(updated, run_repospace):
+    # With -a every member already says it is up to date; the summary exists to break silence.
+    out, _ = run(run_repospace, updated, "compare", "-a")
+    assert "all members are up to date" not in out
+    assert out.splitlines() == [
+        "=== liba (liba): up to date",
+        "=== libb (libb): up to date",
+        "=== libc (libc): up to date",
+    ]
+
+
+def test_compare_clean_quiet(updated, run_repospace):
+    # Scripts reading the output get silence back, as before the summary line.
+    out, _ = run(run_repospace, updated, "-q", "compare")
     assert out == ""
 
 
@@ -465,7 +516,7 @@ def test_compare_ref_named_head(updated, run_repospace):
     # test suite does.
     subprocess.run(["git", "-C", str(libb), "update-ref", "refs/tags/HEAD", "HEAD"], check=True)
     out, _ = run(run_repospace, updated, "compare", "--exit-code")
-    assert out == ""
+    assert out.splitlines() == ["=== all members are up to date"]
 
 
 def test_compare_manifest_member_rejected(updated, run_repospace):

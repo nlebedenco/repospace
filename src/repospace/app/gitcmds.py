@@ -23,6 +23,7 @@ class Diff(MemberCommand):
             "Everything after the first -- goes to git diff untouched; use it for git diff's own "
             "revisions and paths, which are otherwise read as member names, and for options that "
             "collide with this command's (e.g. -a). "
+            "When no member has differences, a single line says so. "
             '"repospace -qq diff" relays --quiet to git diff (exit status only).',
             accepts_unknown_args=True,
             forward_dashdash=True,
@@ -45,11 +46,13 @@ class Diff(MemberCommand):
         # explicitly to color. Placed before the pass-through arguments so the user's flags win.
         color = ansi.use_color(sys.stdout, self.color_ui)
         differences = False
-        for member in self.selected_members(
+        printed = False
+        members = self.selected_members(
             args,
             only_cloned=True,
             unknown_hint='; arguments meant for git diff go after "--"',
-        ):
+        )
+        for member in members:
             command = [
                 "diff",
                 f"--src-prefix={member.path}/",
@@ -84,9 +87,26 @@ class Diff(MemberCommand):
             if result.returncode:
                 differences = True
             output = result.stdout.decode(errors="backslashreplace")
-            if output or args.all:
+            if output:
+                printed = True
                 self.banner(f"diff for {member.name_and_path}:")
                 print(output, end="")
+            elif args.all:
+                # A banner with nothing under it is the silence -a was meant to break; give the
+                # verdict instead, as "compare -a" does. Which verdict it is comes from the exit
+                # status, not from the empty output: a pass-through flag such as --quiet reports
+                # differences without printing them.
+                verdict = "differences not shown" if result.returncode else "no differences"
+                self.banner(f"diff for {member.name_and_path}: {verdict}")
+        if not members:
+            self.banner("no members to diff")
+        elif not (printed or differences or args.all):
+            # As in compare: silence would read as a command that did nothing. Banners already rule
+            # out piping the output as a patch; "repospace -q diff" keeps it clean. Both signals are
+            # needed: plain git diff exits 0 whether or not it printed a patch, while a pass-through
+            # flag such as --quiet reports differences it does not print. With -a every member has
+            # already said where it stands on a line of its own.
+            self.banner("no differences")
         if differences:
             raise CommandError(1)
 
@@ -192,7 +212,8 @@ class Compare(MemberCommand):
             "compare",
             "compare member checkouts against the manifest",
             "Compare each cloned member's HEAD against repospace-rev (the manifest revision as of "
-            "the last update). By default only members with differences are printed.",
+            "the last update). By default only members with differences are printed; when there "
+            "are none, a single line says so.",
         )
 
     def do_add_parser(self, parser_adder):
@@ -214,7 +235,8 @@ class Compare(MemberCommand):
     def do_run(self, args, unknown):
         self.die_if_no_git()
         differences = 0
-        for member in self.selected_members(args, only_cloned=True):
+        members = self.selected_members(args, only_cloned=True)
+        for member in members:
             if isinstance(member, ManifestMember):
                 # Only reachable by explicit naming; without an explicit member list,
                 # selected_members already excludes it.
@@ -228,6 +250,13 @@ class Compare(MemberCommand):
             self.banner(f"{member.name_and_path}:")
             for line in report:
                 print(f"    {line}")
+        if not members:
+            self.banner("no members to compare")
+        elif not differences and not args.all:
+            # Silence would read as a command that did nothing; say the comparison ran and found
+            # nothing. With -a every member already said so on its own line, and "repospace -q
+            # compare" still prints nothing, for scripts.
+            self.banner("all members are up to date")
         if args.exit_code and differences:
             raise CommandError(1)
 
