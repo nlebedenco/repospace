@@ -69,13 +69,27 @@ def isolate_process_state():
         commands._EXT_MODULES_CACHE.clear()
 
 
-def _git(repo, *args, capture=False):
+def _git(repo, *args, capture=False, text=True):
     return subprocess.run(
         ["git", "-C", str(repo), *args],
         check=True,
         stdout=subprocess.PIPE if capture else None,
-        text=capture or None,
+        text=True if capture and text else None,
     )
+
+
+def git_out(repo, *args):
+    """Return the stripped standard output of a git command run in *repo*.
+
+    Here rather than in a test module because three of them want it; import it as
+    "from conftest import git_out".
+    """
+    return _git(repo, *args, capture=True).stdout.strip()
+
+
+def git_bytes(repo, *args):
+    """Like git_out, for output that does not have to be valid UTF-8."""
+    return _git(repo, *args, capture=True, text=False).stdout.strip()
 
 
 class RepoFactory:

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 
 import pytest
+from conftest import git_out
 
 from repospace.app.generate import update_hash, write_if_different
 
@@ -19,15 +19,6 @@ def guard_hash(packages_cmake):
     )
     assert match, "no guard hash in packages.cmake"
     return match.group(1)
-
-
-def git_out(repo, *args):
-    return subprocess.run(
-        ["git", "-C", str(repo), *args],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout.strip()
 
 
 def update(run_repospace, repospace, *args, expect=0):

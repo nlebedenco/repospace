@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 import pytest
+from conftest import git_bytes, git_out
 
 from repospace.manifest import (
     MANIFEST_REV,
@@ -17,24 +18,6 @@ from repospace.manifest import (
     Member,
     member_manifest_content,
 )
-
-
-def git_out(repo, *args):
-    return subprocess.run(
-        ["git", "-C", str(repo), *args],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout.strip()
-
-
-def git_bytes(repo, *args):
-    """Like git_out, for output that need not be valid UTF-8."""
-    return subprocess.run(
-        ["git", "-C", str(repo), *args],
-        check=True,
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
 
 
 def update(run_repospace, repospace, *args, expect=0):
