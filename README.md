@@ -10,6 +10,10 @@ dependencies in its own manifest), loads extension commands provided by members,
 and generates files that let CMake builds consume the repospace layout without
 running any tool at configure time.
 
+Because the composition is a file inside the manifest repository, it is
+reviewed, branched and tagged along with the project that owns it, and a fresh
+clone is one command away from the whole tree.
+
 ## Installation
 
 ```sh
@@ -20,6 +24,10 @@ pip install repospace
 
 - Python >= 3.12
 - git
+
+Every git operation runs the `git` executable found on `PATH`; no git library is
+involved, so members stay ordinary repositories that any git tool can work with.
+PyYAML, which parses manifests, is the only runtime dependency.
 
 ## Quick start
 
@@ -42,6 +50,12 @@ manifest:
       path: external/other
 ```
 
+`mylib` names little more than a checkout path: its fetch URL comes from the
+default remote (`https://example.com/repos/mylib`) and its revision from the
+default revision, `main`. `other` spells out a URL of its own and pins a tag
+instead, which is what the per-member attributes are for — the defaults carry
+the common case so that each entry states only what is particular to it.
+
 Clone your manifest repository and initialize the repospace in one step:
 
 ```sh
@@ -62,8 +76,12 @@ repospace update
 repospace list
 ```
 
-A repospace is always colocated with its manifest repository: `init` creates a
-`.repospace/` directory, and the directory containing it is the repospace root.
+Both forms of `init` end in the same place, because a repospace is always
+colocated with its manifest repository: `init` creates a `.repospace/`
+directory, and the directory containing it is the repospace root. Commands find
+that root by walking up from the current directory until they see `.repospace/`,
+the way git finds `.git` — which is why they work from anywhere inside the tree.
+
 The manifest is `<root>/repospace.yaml` by default; `init --manifest FILE`
 selects another file inside the manifest repository and records it as the
 `manifest.file` configuration option, the same choice an importing manifest has
@@ -72,13 +90,25 @@ with `import: file:`.
 `update` clones every active member (and everything their own manifests declare,
 recursively, according to the import rules) into its declared subdirectory,
 points it at the manifest revision with a detached `HEAD`, and records that
-revision in the repospace-owned branch `repospace-rev` of each member. Members
-are cloned with `git init` plus `git remote add`, never `git clone`, and
-Repospace claims only the `repospace-rev` branch and the `origin` remote name.
+revision in the repospace-owned branch `repospace-rev` of each member.
 
-Never commit `.repospace/`; `init` refuses a clone that contains it. Add it and
-the member locations (`external/` in the example above) to the manifest
-repository's `.gitignore`.
+Members are cloned with `git init` plus `git remote add`, never `git clone`,
+because repospace claims only the branch `repospace-rev` and the remote name
+`origin`. The rest of the checkout is yours — the branches you create, the
+remotes you add — and `update` moves `HEAD`, not them; `-k` and `-r` ask it to
+keep or rebase a checked-out branch instead of detaching from it.
+
+`repospace-rev` is also what the rest of the tool reads back: `compare` measures
+a member's `HEAD` against it, `list` derives its staleness flags from it, and a
+manifest imported from a member is read out of `refs/heads/repospace-rev` rather
+than from the working tree, so resolution sees the committed state of the last
+update and never a local edit.
+
+Never commit `.repospace/`; `init` refuses a clone that contains it. The
+directory holds what belongs to a single checkout — its local configuration file
+and the generated files — so each checkout has to create its own. Add it and the
+member locations (`external/` in the example above) to the manifest repository's
+`.gitignore`.
 
 ## Commands
 
@@ -100,12 +130,16 @@ repository's `.gitignore`.
 
 Run `repospace help <command>` for details. The global flags `-v`, `-q`, and
 `-V` are recognized before the command name only; everything after the command
-name belongs to the command, so `diff`, `status`, and `grep` pass unknown
-arguments through to the underlying tool untouched.
+name belongs to the command. That split is what lets `diff`, `status`, and
+`grep` pass unknown arguments through to the underlying tool untouched: in
+`repospace diff mylib -- --stat`, the `--stat` reaches `git diff` as written
+instead of being read as a repospace option.
 
 Members can provide additional commands through the `extension-commands`
 manifest attribute; `repospace help` lists the extensions available in a
-repospace, grouped by the member providing them. See
+repospace, grouped by the member providing them. A repospace therefore offers
+the command set its own manifest describes, so project-specific tooling ships
+with the project rather than with repospace. See
 [docs/extensions.md](docs/extensions.md) for how to write one.
 
 Command aliases are defined with the `alias.<name>` configuration option.
@@ -116,50 +150,69 @@ See [docs/manifest.md](docs/manifest.md) for the complete manifest format:
 sections (`version`, `defaults`, `remotes`, `members`, `self`, `group-filter`),
 recursive imports with allowlist/blocklist filters, member groups, extension
 commands, and CMake packages. A JSON Schema is at
-[scripts/schemas/manifest-schema.json](scripts/schemas/manifest-schema.json).
+[scripts/schemas/manifest-schema.json](scripts/schemas/manifest-schema.json),
+for editors that validate YAML while it is written.
 
 Notes:
 
-- The default revision is `main`. Members whose upstream default branch is
-  `master` need an explicit `revision: master`.
+- The default revision is `main` — a fixed default, not the default branch the
+  remote happens to advertise. Members whose upstream default branch is `master`
+  need an explicit `revision: master`.
 
-- `repospace update` never deletes directories. A member removed from the
-  manifest stays on disk; `repospace list` warns about it.
+- `repospace update` never deletes directories. A member dropped from the
+  manifest keeps its checkout, uncommitted work included; `repospace list` warns
+  that it is no longer declared, so nothing disappears silently and nothing is
+  forgotten either.
 
-- `repospace mirror` is the only command that writes to a remote. It pushes
-  the upstream branches and tags a member's `upstream` attribute selects to
-  that member's `origin`. Deleting the origin refs it does not select is
-  opt-in, with `repospace mirror --prune`.
+- `repospace mirror` is the only command that writes to a remote. It pushes the
+  upstream branches and tags a member's `upstream` attribute selects to that
+  member's `origin`. Deleting the origin refs it does not select is a second
+  decision, and therefore opt-in, with `repospace mirror --prune`.
 
-- Extension commands execute code from cloned repositories. Only use manifests
-  you trust, or disable extensions with `repospace config
-  commands.allow-extensions false`.
+- Extension commands execute code from cloned repositories, with the privileges
+  of whoever runs `repospace`. Only use manifests you trust, or disable
+  extensions with `repospace config commands.allow-extensions false`.
 
 ## CMake integration
 
-Every `repospace update` regenerates two files in `<topdir>/.repospace/`, even
-when some members failed, so they always describe what is on disk:
+The build side of a repospace is deliberately inert: `update` writes plain files
+that CMake reads, so configuring a build tree requires neither repospace on the
+`PATH` nor a network round trip. Every `repospace update` regenerates two files
+in `<topdir>/.repospace/`, even when some members failed, since the members that
+did move are on disk and these files describe what is there:
 
 - `packages.cmake` sets `ENV{<name>_ROOT}` to the declaring member's absolute
-  path for every name listed in a `cmake-packages` attribute, unless the
-  variable is already set, so that `find_package()` finds packages provided by
-  members. The first declaration of a name wins, and inactive members are
-  skipped. The file starts with a guard: the cache variable
-  `REPOSPACE_UPDATE_HASH` records a hash of the repospace state at the first
-  configure, and a later configure with a different hash fails with a message
-  asking for `cmake --fresh`. The hash changes whenever a member is added,
-  removed, moved, activated or deactivated by a group filter, or checked out at
-  a different commit.
+  path for every name listed in a `cmake-packages` attribute, so that
+  `find_package()` finds packages provided by members. Each assignment is
+  guarded by `if(NOT DEFINED ENV{<name>_ROOT})`, which leaves a root already set
+  in the environment alone: the generated file supplies a default, it does not
+  overrule a deliberate choice made by a developer or a CI job. The first
+  declaration of a name wins, and inactive members are skipped — their checkout
+  may not exist, and a root pointing at a missing directory is worse than no
+  root at all.
 
 - `members.json` holds every resolved member as a flat array in resolution order
   (`name`, `path`, `abspath`, `url`, `revision`, `sha`, `groups`,
   `cmake-packages`, `extension-commands`, `declared-by`), beside `topdir` and a
-  format `version` (a string, like the manifest's, currently `"1.0"`), for
-  consumption with `string(JSON)`. `sha` is the commit recorded in
-  `repospace-rev` at the last update and `declared-by` the manifest that
-  declared the member.
+  format `version`, for consumption with `string(JSON)`. The version is a
+  string, like the manifest's, so both are read the same way and `"1.0"` cannot
+  arrive as the number `1.0`. `sha` is the commit recorded in `repospace-rev` at
+  the last update and `declared-by` the manifest that declared the member. The
+  file doubles as the snapshot `list` compares the current manifest against,
+  which is how it can report that a member was added, moved, or re-pointed since
+  the last update.
 
-Use them from a top-level `CMakeLists.txt`:
+`packages.cmake` opens with a guard: the cache variable `REPOSPACE_UPDATE_HASH`
+records a hash of the repospace state at the first configure, and a later
+configure with a different hash fails with a message asking for `cmake --fresh`.
+The point is that a CMake cache remembers the paths it resolved; if the
+repospace changed underneath it, the build tree would keep using answers that
+were true for a layout that is gone. The hash covers `members.json` together
+with the generated package roots, so it changes whenever a member is added,
+removed, moved, activated or deactivated by a group filter, or checked out at a
+different commit.
+
+Include `packages.cmake` from a top-level `CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.24)
@@ -168,20 +221,28 @@ include(${CMAKE_CURRENT_LIST_DIR}/.repospace/packages.cmake)
 project(myapp)
 ```
 
-Both files are written only when their content changes, so they are safe to list
-in `CMAKE_CONFIGURE_DEPENDS`. Only `repospace update` refreshes them; git
-operations done by hand inside members do not.
+Both files are written only when their content changes — an unchanged file is
+not opened for writing at all, so its timestamp survives and listing it in
+`CMAKE_CONFIGURE_DEPENDS` does not force a reconfigure after every update. Only
+`repospace update` refreshes them; git operations done by hand inside members do
+not, so what they describe is the last update, not the current working trees.
 
 ## Configuration
 
 Git-style INI configuration, with options named `section.key`, at three levels.
-Local wins over global, and global over system.
+Local wins over global, and global over system, as in git: a preference set once
+in the global file holds everywhere until a particular repospace overrides it.
 
 | Level  | File                                                                                                                     | Override                  |
 |--------|--------------------------------------------------------------------------------------------------------------------------|---------------------------|
 | system | `/etc/repospace-config` (`%PROGRAMDATA%\repospace\config` on Windows)                                                    | `REPOSPACE_CONFIG_SYSTEM` |
 | global | `~/.repospace-config` if it exists, else `$XDG_CONFIG_HOME/repospace/config` (`XDG_CONFIG_HOME` defaults to `~/.config`) | `REPOSPACE_CONFIG_GLOBAL` |
 | local  | `<topdir>/.repospace/config`                                                                                             | `REPOSPACE_CONFIG_LOCAL`  |
+
+Each `REPOSPACE_CONFIG_*` variable replaces the file of its level outright,
+which is what makes a run reproducible on a machine whose own configuration
+files should not be consulted — the test suite points all three at scratch
+paths for exactly that reason.
 
 Like git config, section and key names are case-insensitive and stored in
 lowercase. Recognized options:
@@ -200,6 +261,13 @@ lowercase. Recognized options:
 | `grep.<tool>-path`          | path to that tool's executable                                                                                | none             |
 | `alias.<name>`              | command alias; the value is a repospace command line, shell-quoted                                            | none             |
 
+The `update` options trade network cost against freshness. `smart` skips the
+fetch when the declared revision is a tag or commit the member already has,
+since such a revision cannot have moved under it; `always` fetches every time,
+which is what members pinned to a branch call for, as a branch does move.
+`update.narrow` acts on the fetch itself, asking for the manifest revision
+alone rather than for every branch and tag.
+
 ## Development
 
 ```sh
@@ -210,10 +278,12 @@ pre-commit install
 pytest
 ```
 
-`./bootstrap` (`bootstrap.cmd` on Windows) creates the venv, installs the
-project with its dev dependencies and the pre-commit hooks, provisions Node.js
-inside the venv for `markdownlint-cli2` (which the pre-commit hooks run on
-Markdown files), and configures the repository's commit message template.
+`./bootstrap` (`bootstrap.cmd` on Windows) runs that same setup — everything
+above except the test run — plus the two steps that are easy to forget: it
+provisions Node.js inside the venv for `markdownlint-cli2`, which the
+pre-commit hooks run on Markdown files as a `language: system` entry and which
+therefore stays out of the host's global npm, and it points git at the
+repository's commit message template.
 
 ### VS Code
 

@@ -28,19 +28,32 @@ manifest:
   group-filter: [-optional]
 ```
 
-Unknown keys are rejected everywhere. So are keys with an explicit null value
-(e.g. a `groups:` whose entries were all commented out) — remove the key
-instead; only `manifest:` and `userdata:` may be null. Empty strings are
-rejected wherever a value would otherwise silently fall back to a default or
-change meaning (`name`, `remote`, `repo-path`, `url`, `path`, `revision`,
-`remotes` entries, `import` paths, `import: file:`, and the
-`path-allowlist`/`path-blocklist` patterns).
+Validation is strict, because what a manifest describes is carried out by
+creating directories and moving checkouts: a defect that survives parsing does
+not stay a data problem, it becomes a wrong tree on disk.
+
+- Unknown keys are rejected everywhere, so a misspelled attribute is reported
+  rather than quietly ignored.
+
+- So are keys with an explicit null value (e.g. a `groups:` whose entries were
+  all commented out) — remove the key instead; only `manifest:` and `userdata:`
+  may be null. Everything else is typed non-null, and a null left in place
+  would be coerced downstream instead of refused (`str(None)` is the revision
+  `"None"`) or would break path derivation outright.
+
+- Empty strings are rejected wherever a value would otherwise silently fall
+  back to a default or change meaning (`name`, `remote`, `repo-path`, `url`,
+  `path`, `revision`, `remotes` entries, `import` paths, `import: file:`, and
+  the `path-allowlist`/`path-blocklist` patterns). An empty `path`, for one,
+  reads as "the directory this is relative to", which is never what an entry
+  means to say.
 
 A machine-readable JSON Schema of this format is at
 [scripts/schemas/manifest-schema.json](../scripts/schemas/manifest-schema.json).
 The installed package ships the same file under the environment prefix, as
 `share/repospace/schemas/manifest-schema.json` — for a virtual environment,
-`<venv>/share/repospace/schemas/manifest-schema.json`.
+`<venv>/share/repospace/schemas/manifest-schema.json` — so an editor can be
+pointed at the copy that belongs to the repospace it is editing.
 
 ## version
 
@@ -54,39 +67,64 @@ version of its own. The current, and so far only, schema version is `0.2`, which
 shipped with repospace 0.2.0.
 
 The value must name a released schema version exactly. A newer one fails with an
-error asking to upgrade repospace — that is what the key buys. Anything else,
-including a spelling that merely compares equal such as `0.2.0`, is rejected as
-invalid with the list of versions this repospace accepts.
+error asking to upgrade repospace — that is what the key buys, and it is
+reported before any other check, so a file written for a later repospace is
+answered with "upgrade" rather than with a list of versions that could not
+possibly contain what it asks for. Anything else is rejected as invalid with the
+list of versions this repospace accepts, including a spelling that merely
+compares equal such as `0.2.0`: one version has one spelling, or two manifests
+declaring the same thing would not compare equal as text.
 
 The declared version is not a claim repospace checks the file against: nothing
 verifies that a file declaring an older version restricts itself to what that
 version offered. It only says which repospace can read the file.
 
-The version is checked per file, including imported ones, before anything else.
+The version is checked per file, including imported ones, before anything else —
+an imported file comes from another repository and may well have been written
+for a repospace newer than the one reading it.
 
 ## defaults
 
 - `remote`: remote used by members that give neither `remote` nor `url`.
-- `revision`: revision for members without one (default: `main`). Like every
-  revision, it must be a plausible git refname or commit SHA: no leading `-`
-  or `+`, and none of the characters a refname cannot contain (whitespace,
-  `~`, `^`, `:`, `?`, `*`, `[`, `\`, `..`, `@{`). A revision is passed to git
-  as a fetch refspec and as a revision argument, where each of those has a
-  meaning of its own; a `:` would make `update` move a local branch of the
-  member.
+- `revision`: revision for members without one (default: `main`).
+
+Like every revision, the default must be a plausible git refname or commit SHA:
+no leading `-` or `+`, and none of the characters a refname cannot contain
+(whitespace, `~`, `^`, `:`, `?`, `*`, `[`, `\`, `..`, `@{`). The rule is not
+pedantry about refname syntax; a revision reaches git twice, as a fetch refspec
+and as a revision argument, and each refused character has a meaning of its own
+in those positions. `:` separates a refspec's source from its destination, so it
+would let a manifest move a local branch of the member; `*` makes the refspec a
+pattern; `^`, `~`, `..` and `@{` are revision operators; `?`, `[` and `\` are
+glob syntax; whitespace and control characters split or hide the argument. A
+leading `-` would be read as a command-line option by the git commands that take
+a revision, and a leading `+` marks a refspec as forced for the name that
+follows it, so `update` would fetch a branch other than the one named (write
+`refs/heads/<name>` instead).
+
+For the same reason a revision must be a string and never a bare number: YAML
+mangles unquoted numeric revisions (`1.10` becomes the float `1.1`, `0700` an
+octal integer), and a number where a revision belongs is almost always a missing
+pair of quotes.
 
 `defaults` and `remotes` apply only to the file that contains them; they are
-never inherited across imports.
+never inherited across imports, so a manifest resolves to the same members
+whether it is read as the top-level file or through an importer that happens to
+define names of its own.
 
 ## remotes
 
 Named URL prefixes. Each entry needs `name` and `url-base`; names must be unique
-within the file. A member using a remote gets the fetch URL
-`url-base + "/" + (repo-path or name)`; trailing slashes on `url-base` are
-dropped.
+within the file, since a repeated name would let the later entry win silently
+and make the URL a member gets depend on declaration order. A member using a
+remote gets the fetch URL `url-base + "/" + (repo-path or name)`; trailing
+slashes on `url-base` are dropped.
 
 Remote names are manifest-internal identifiers for URL prefixes: in a cloned
 member the git remote is always named `origin`, however the URL was declared.
+Nothing about the name a manifest chose survives into the checkout, which is
+what lets an imported manifest use its own names without colliding with the
+importing one.
 
 ## members
 
@@ -110,14 +148,35 @@ Each entry accepts:
 | `upstream`           | mapping          | none                | The repository this member's origin forks, and the refs `repospace mirror` keeps equal to it (see below)             |
 | `userdata`           | any              | none                | Ignored by repospace                                                                                                 |
 
-Member paths use forward slashes and are confined to the repospace: backslashes,
-absolute paths, drive letters, `..` escapes, `.git` path components (in any case
-— member content must never act as a git directory), and placement inside
-`.repospace/` are rejected lexically. A path is normalized before it is used, so
-`libs/x/../y` *is* `libs/y` — that is the placement, and the form re-emitted by
-`manifest --resolve`; a path that normalizes to the repospace top itself (or, in
-an imported manifest, to its `path-prefix` directory) is rejected. Confinement
-is to the repospace top, not to the `path-prefix`: under a prefix of `external`,
+`manifest` is reserved as a name because it is what repospace calls the manifest
+repository itself: it is also the value `declared-by` holds for a member the
+manifest repository declares. A member of that name could not be told from it.
+
+### Member paths
+
+Member paths use forward slashes and are confined to the repospace. The
+following are rejected lexically, before anything touches the filesystem:
+
+- backslashes — member paths are POSIX paths and normalized by POSIX rules,
+  under which a backslash is an ordinary filename character and not a
+  separator, so `libs\x` would name one directory rather than two;
+- absolute paths and, on Windows, drive letters: a drive-relative path such as
+  `C:evil` is not "absolute", yet joining it discards the repospace top
+  entirely;
+- `..` escapes, checked on the first path component after normalization (`..`
+  as a whole component, so a directory legitimately named `..foo` is fine);
+- `.git` path components, in any case, since some filesystems are
+  case-insensitive — member content must never land where git treats it as a
+  git directory, hooks included, which git would execute on the next command;
+- placement inside `.repospace/`, which belongs to the tool.
+
+A path is normalized before it is used, so `libs/x/../y` *is* `libs/y` — that is
+the placement, and the form re-emitted by `manifest --resolve`; normalizing
+first is what keeps the checks above, the checkout location and the resolved
+output all speaking of one directory. A path that normalizes to the repospace
+top itself (or, in an imported manifest, to its `path-prefix` directory) is
+rejected: that is a member with no directory of its own. Confinement is to the
+repospace top, not to the `path-prefix`: under a prefix of `external`,
 `path: ../tools/foo` places the member at `tools/foo`.
 
 Member checkouts live in real directories inside the repospace: no existing
@@ -166,12 +225,11 @@ mirror is always for at least one.
 A mirror run pushes to `origin` every upstream branch its `mirror: heads`
 patterns select and its `preserve: heads` patterns do not, and every upstream
 tag its `mirror: tags` patterns select and its `preserve: tags` patterns do not.
-`preserve` always wins
-over `mirror`: a preserved ref is never pushed to, even where upstream has a ref
-of the same name, so work that exists only on `origin` is never overwritten by
-an upstream ref that collides with it. Mirrored refs, on the other hand, belong
-to upstream: they are force-updated, and any commit `origin` alone held on one
-of them is dropped.
+`preserve` always wins over `mirror`: a preserved ref is never pushed to, even
+where upstream has a ref of the same name, so work that exists only on `origin`
+is never overwritten by an upstream ref that collides with it. Mirrored refs, on
+the other hand, belong to upstream: they are force-updated, and any commit
+`origin` alone held on one of them is dropped.
 
 Deleting is opt-in. With `repospace mirror --prune`, every `origin` branch and
 tag that is neither selected by `mirror` nor selected by `preserve` is deleted,
@@ -204,19 +262,19 @@ the rest of the pattern matches, and the last pattern matching a name is the one
 that decides. So `['**', '!wip/*']` selects every name except the ones below
 `wip/`, and `['**', '!wip/*', 'wip/keep']` selects that one back. An exclusion
 only narrows what another pattern selected, so a list of nothing but exclusions
-selects nothing and is refused; `mirror: tags: []` is how to select nothing on
-purpose.
+selects nothing whatever refs exist, and is refused as the mistake it almost
+certainly is; `mirror: tags: []` is how to select nothing on purpose.
 
 Only the first `!` is the marker, and the pattern below it reads a `!`
 literally, so `!!x` excludes the ref named `!x`. A pattern that selects has no
 such escape — the language has no escape character — so a ref name beginning
 with `!` is selected only by a pattern that reaches it with a wildcard.
 
-Patterns are never handed to git, so unlike a revision they may hold glob
-syntax; the remaining refname rules still apply (no whitespace, `~`, `^`, `:`,
-`\`, `..` or `@{`, and `@` alone is not a pattern). A qualified pattern such as
-`refs/heads/main` is well formed and matches nothing, since the name it is
-matched against is `main`.
+Patterns are never handed to git, which is why, unlike a revision, they may hold
+glob syntax; the remaining refname rules still apply (no whitespace, `~`, `^`,
+`:`, `\`, `..` or `@{`, and `@` alone is not a pattern). A qualified pattern
+such as `refs/heads/main` is well formed and matches nothing, since the name it
+is matched against is `main`.
 
 `repospace mirror` refuses a member whose `mirror: heads` matches none of the
 branches upstream has, with or without `--prune`. A mirror is always for at
@@ -262,8 +320,9 @@ directory name `git clone` derives from the URL, which is also the fallback when
 `name` is absent). It must be a single plain path component that does not start
 with a dot — the manifest author may suggest a name, but only the caller decides
 placement on their filesystem, and the author must not create hidden or
-git-confusing directories (`.git`, `.repospace`) there. After cloning, `name` is
-never consulted again.
+git-confusing directories (`.git`, `.repospace`) there. Refusing a leading dot
+covers `.` and `..` in the same rule. After cloning, `name` is never consulted
+again.
 
 ### Git hygiene
 
@@ -283,17 +342,21 @@ A manifest can import other manifests:
 - from a member (`members: - import:`) — a path inside the member, with the same
   confinement (no absolute paths, no `..` escapes) — read from git at
   `refs/heads/repospace-rev`, i.e. the member's state as of the last
-  `repospace update`. During `update`, the member is cloned and fetched the
-  moment its manifest data is needed, so resolution always sees fresh data. A
-  `self: import:` inside a manifest read from a member is resolved the same way
-  — from the member's `repospace-rev`, never from its working tree.
+  `repospace update`. Reading from git rather than from the working tree keeps
+  resolution reproducible: what a member contributes is the revision the
+  manifest pins it to, not whatever is checked out or half-edited in it. During
+  `update`, the member is cloned and fetched the moment its manifest data is
+  needed, so resolution always sees fresh data. A `self: import:` inside a
+  manifest read from a member is resolved the same way — from the member's
+  `repospace-rev`, never from its working tree.
 
 Manifest data is never read through a symbolic link, by either route: an
 imported file (or a `.yml`/`.yaml` file inside an imported directory) that is a
 link is an error, and so is a link anywhere on the path to it below the
-repository root. Git stores a link as a file whose content is its target, so
-following one on the filesystem would make the same repository resolve
-differently depending on where it was read from.
+repository root. Git stores a link as a file whose content is its target, so on
+the git side a linked file's target text would be parsed as YAML and a path
+through a linked directory would not resolve at all — the same repository would
+then resolve differently depending on which route read it.
 
 Accepted forms:
 
@@ -318,10 +381,11 @@ matches `a/b/foo`) and must name at least one path component (`''` and `.` are
 rejected). A member matched by an allowlist is imported even if a blocklist also
 matches. With no allowlist, everything not blocklisted is imported; with an
 allowlist, only listed entries are. Filters compose down the import tree — a
-nested import can only narrow what its parent allowed. `path-prefix` accumulates
-by path joining and applies only to the imported content; the importing member's
-own placement comes from its `path` attribute. `true` and `false` are not
-allowed under `self: import:`.
+nested import can only narrow what its parent allowed, so an imported manifest
+cannot widen its way back into members its importer excluded. `path-prefix`
+accumulates by path joining and applies only to the imported content; the
+importing member's own placement comes from its `path` attribute. `true` and
+`false` are not allowed under `self: import:`; name the file to import instead.
 
 ### Precedence
 
@@ -330,22 +394,27 @@ file's `members:`, then member imports in declaration order. The first
 definition of a member name wins; later definitions are ignored, and an ignored
 definition's `import:` is never processed. So self-imports override the
 top-level file, which overrides member imports — dropping an override file into
-a self-imported directory (its name sorts first) overrides everything.
+a self-imported directory (its name sorts first) overrides everything. Read the
+other way round, the order says that an imported manifest can add members but
+never replace one the importing repository has already defined.
 
 Import cycles are rejected with the cycle spelled out ("import cycle:
-repospace.yaml -> a.yaml -> b.yaml -> a.yaml"). Importing the same file on two
-sibling branches (a diamond) is legal; duplicate members are handled by
-first-definition-wins. Deeply nested non-cyclic imports fail with "import level
-too deep".
+repospace.yaml -> a.yaml -> b.yaml -> a.yaml"). Only the ancestor chain counts,
+so importing the same file on two sibling branches (a diamond) is legal — it
+terminates, and duplicate members are settled by first-definition-wins. Deeply
+nested non-cyclic imports fail with "import level too deep".
 
 ## group-filter
 
 A list of `+group`/`-group` entries; `-` disables a group by default. A member
-is inactive when all of its groups are disabled; inactive members are skipped by
-`update` and hidden from default `list` output. Filters from imported manifests
-apply with lower precedence than the importing file; self-imported filters have
-the highest. The `manifest.group-filter` configuration option and
-`update --group-filter` apply on top of everything.
+is inactive when all of its groups are disabled, so a member belonging to
+several groups survives as long as one of them is enabled; inactive members are
+skipped by `update` and hidden from default `list` output. Filters from imported
+manifests apply with lower precedence than the importing file; self-imported
+filters have the highest. The `manifest.group-filter` configuration option and
+`update --group-filter` apply on top of everything, in that order — the file
+states the project's default, the configuration adapts it to a machine, and the
+command line to a single run.
 
 ## Extension commands
 
@@ -353,21 +422,25 @@ the highest. The `manifest.group-filter` configuration option and
 relative to the member root (or to the manifest repository root under `self:`).
 Each file declares Python files inside the same repository and the command
 classes they provide; the Python files are imported only when a command is run
-or its help is requested. Built-in names cannot be overridden; when two members
-provide the same command name, the member earlier in resolution order wins.
+or its help is requested, so discovering extensions never executes member code.
+Built-in names cannot be overridden; when two members provide the
+same command name, the member earlier in resolution order wins.
 See [extensions.md](extensions.md) for the specification format and how to
 write a command.
 
 When a manifest imported from a member declares `extension-commands` (or
 `cmake-packages`) under its own `self:` section, those values are attributed to
-that member.
+that member, so a repository can describe what it provides without the importing
+manifest repeating it.
 
 ## cmake-packages
 
 Lists CMake package names exposed by a member (or by the manifest repository
 under `self:`). Package names may only contain letters, digits, and `._+-` (and
 must not start with punctuation), because they are interpolated into generated
-CMake code. On every `update`, repospace writes `.repospace/packages.cmake`,
-which sets `ENV{<name>_ROOT}` to the declaring member's absolute path for every
-declared package (first declaration wins), plus `.repospace/members.json` with
-all resolved member data. See the README for the CMake workflow.
+CMake code, in a position (`ENV{<name>_ROOT}`) that cannot be quoted — a name
+free of that restriction could break the generated file or smuggle code into it.
+On every `update`, repospace writes `.repospace/packages.cmake`, which sets
+`ENV{<name>_ROOT}` to the declaring member's absolute path for every declared
+package (first declaration wins), plus `.repospace/members.json` with all
+resolved member data. See the README for the CMake workflow.
