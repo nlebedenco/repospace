@@ -23,9 +23,9 @@ dependencies = ["PyYAML>=6.0"]
 [project.optional-dependencies]
 dev = [
     "pre-commit>=4.5.0",
-    "gitlint-core >= 0.19.1",
+    "gitlint-core>=0.19.1",
     "black>=26.3.1",
-    "nodeenv >= 1.10.0",
+    "nodeenv>=1.10.0",
     "pytest>=7",
     "pytest-cov>=5"
 ]
@@ -62,6 +62,18 @@ testpaths = ["tests"]
 [tool.black]
 # Line length should match the setting in .editorconfig
 line-length = 100
+
+# The syntax level Black's output may use, which is not what the package runs on: requires-python
+# stays open-ended (">=3.12"), so a host with a newer Python installs and runs this as before.
+#
+# Pinned rather than inferred. Left to itself Black reads that same open-ended requires-python,
+# finds no upper bound, and targets every version it knows of - py312 through py315 today - which
+# is it deciding the source may be 3.15 when it is not. The formatting does not change either way,
+# since with several targets Black only emits syntax common to all of them and the floor governs;
+# what changes is the --safe check, which re-parses the result with the running interpreter and
+# compares it against the highest target, so a 3.12 interpreter warns that it cannot verify code
+# formatted for 3.15. One entry is enough: what 3.12 parses, every later version parses too.
+target-version = ["py312"]
 
 # Force exclude works like --exclude and --extended-exclude, but files and directories matching the
 # regex will be excluded even when they are passed explicitly as arguments. This is useful when
