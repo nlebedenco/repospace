@@ -115,7 +115,7 @@ See [docs/manifest.md](docs/manifest.md) for the complete manifest format:
 sections (`version`, `defaults`, `remotes`, `members`, `self`, `group-filter`),
 recursive imports with allowlist/blocklist filters, member groups, extension
 commands, and CMake packages. A JSON Schema is at
-[scripts/schemas/repospace-manifest-schema.json](scripts/schemas/repospace-manifest-schema.json).
+[scripts/schemas/manifest-schema.json](scripts/schemas/manifest-schema.json).
 
 Notes:
 

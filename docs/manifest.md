@@ -37,7 +37,10 @@ change meaning (`name`, `remote`, `repo-path`, `url`, `path`, `revision`,
 `path-allowlist`/`path-blocklist` patterns).
 
 A machine-readable JSON Schema of this format is at
-[scripts/schemas/repospace-manifest-schema.json](../scripts/schemas/repospace-manifest-schema.json).
+[scripts/schemas/manifest-schema.json](../scripts/schemas/manifest-schema.json).
+The installed package ships the same file under the environment prefix, as
+`share/repospace/schemas/manifest-schema.json` — for a virtual environment,
+`<venv>/share/repospace/schemas/manifest-schema.json`.
 
 ## version
 

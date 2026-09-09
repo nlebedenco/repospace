@@ -128,6 +128,9 @@
   },
   "git.ignoreLimitWarning": true,
   "json.format.keepLines": false,
+  "macros.sourceDirectories": [
+    "${workspaceFolder}/.vscode/macros"
+  ],
   "macros.startupMacros": [
     "${workspaceFolder}/.vscode/macros/select-venv.js"
   ],
@@ -191,11 +194,8 @@
   "yaml.extension.recommendations": false,
   "yaml.format.printWidth": 100,
   "yaml.schemas": {
-    "scripts/schemas/repospace-manifest-schema.json": [
+    "scripts/schemas/manifest-schema.json": [
       "repospace.yaml"
     ]
-  },
-  "macros.sourceDirectories": [
-    "${workspaceFolder}/.vscode/macros"
-  ]
+  }
 }

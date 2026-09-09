@@ -51,6 +51,11 @@ version = { attr = "repospace.__version__" }
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# Installed relative to sys.prefix, i.e. <venv>/share/repospace/schemas on POSIX and
+# <venv>\share\repospace\schemas on Windows.
+[tool.setuptools.data-files]
+"share/repospace/schemas" = ["scripts/schemas/manifest-schema.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
