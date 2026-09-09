@@ -36,7 +36,7 @@ def test_members_json_content(repospace, run_repospace):
     update(run_repospace, repospace)
     members_json, _ = generated(repospace)
     data = json.loads(members_json.read_text())
-    assert data["version"] == 1
+    assert data["version"] == "1.0"
     assert data["topdir"] == str(repospace.ws)
     members = data["members"]
     assert [m["name"] for m in members] == ["manifest", "liba", "libb", "libc"]

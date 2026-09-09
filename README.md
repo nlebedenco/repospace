@@ -148,9 +148,10 @@ when some members failed, so they always describe what is on disk:
 - `members.json` holds every resolved member as a flat array in resolution order
   (`name`, `path`, `abspath`, `url`, `revision`, `sha`, `groups`,
   `cmake-packages`, `extension-commands`, `declared-by`), beside `topdir` and a
-  format `version`, for consumption with `string(JSON)`. `sha` is the commit
-  recorded in `repospace-rev` at the last update and `declared-by` the manifest
-  that declared the member.
+  format `version` (a string, like the manifest's, currently `"1.0"`), for
+  consumption with `string(JSON)`. `sha` is the commit recorded in
+  `repospace-rev` at the last update and `declared-by` the manifest that
+  declared the member.
 
 Use them from a top-level `CMakeLists.txt`:
 
